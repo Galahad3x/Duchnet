@@ -5,4 +5,8 @@ public class PeerInfo {
         this.ip = ip;
         this.port = port;
     }
+
+    public String toString(){
+        return ip + ":" + port.toString();
+    }
 }

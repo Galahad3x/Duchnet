@@ -22,6 +22,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     private void update_files() {
         File f = new File(this.folder_route);
+        List<Content> extra_contents = new LinkedList<>();
         for (File file : Objects.requireNonNull(f.listFiles())) {
             System.out.println("File name: " + file.getName());
             Scanner scanner = new Scanner(System.in);
@@ -33,12 +34,53 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     Arrays.asList(descriptions),
                     this.getFileHash(file),
                     Arrays.asList(tags));
+            extra_contents.add(this_file);
+        }
+        merge_lists(contents, extra_contents);
+    }
+
+    /**
+     * List all the files read in the folder
+     * TODO Save the info on a file for later use (Quality Features: On a database)
+     */
+    public void list_files(boolean add_data) {
+        // Just list local files
+        if (!add_data) {
+            File f = new File(this.folder_route);
+            List<Content> extra_files = new LinkedList<>();
+            for (File file : Objects.requireNonNull(f.listFiles())) {
+                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                        new ArrayList<>(),
+                        this.getFileHash(file),
+                        new ArrayList<>());
+                extra_files.add(this_file);
+            }
+            // TODO Read hash related info in a file or db
+            merge_lists(contents, extra_files);
+        } else {
+            update_files();
+        }
+        print_contents(this.contents);
+    }
+
+    public void print_contents(List<Content> contents){
+        for (Content content : contents) {
+            System.out.println(content.getFilenames());
+            System.out.println(content.getFileDescriptions());
+            System.out.println(content.getTags());
+            System.out.println(content.getHash());
+            System.out.println("------------------------------");
+        }
+    }
+
+    public static void merge_lists(List<Content> original, List<Content> extra) {
+        for (Content this_file : extra) {
             boolean found = false;
-            for (Content content : contents) {
+            for (Content content : original) {
                 if (content.getHash().equals(this_file.getHash())) {
                     found = true;
-                    if (!this_file.getFilenames().get(0).strip().equals("") && !content.getFilenames().contains(this_file.getFilenames().get(0).strip())) {
-                        content.add_alternative_name(this_file.getFilenames().get(0).strip());
+                    if (!this_file.getFilenames().get(0).equals("")) {
+                        content.add_alternative_name(this_file.getFilenames().get(0));
                     }
                     for (String desc : this_file.getFileDescriptions()) {
                         if (!desc.equals("") && !content.getFileDescriptions().contains(desc)) {
@@ -53,48 +95,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 }
             }
             if (!found) {
-                contents.add(this_file);
+                original.add(this_file);
             }
         }
     }
 
-    /**
-     * List all the files read in the folder
-     * TODO Save the info on a file for later use (Quality Features: On a database)
-     */
-    public void list_files(boolean add_data) {
-        // Just list local files
-        if (!add_data) {
-            File f = new File(this.folder_route);
-            for (File file : Objects.requireNonNull(f.listFiles())) {
-                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        new ArrayList<>(),
-                        this.getFileHash(file),
-                        new ArrayList<>());
-                // TODO Read hash related info in a file or db
-                boolean found = false;
-                for (Content content : contents) {
-                    if (content.getHash().equals(this_file.getHash())) {
-                        found = true;
-                        if (!this_file.getFilenames().get(0).equals("")) {
-                            content.add_alternative_name(this_file.getFilenames().get(0));
-                        }
-                    }
-                }
-                if (!found) {
-                    contents.add(this_file);
-                }
-            }
-        } else {
-            update_files();
-        }
-        for (Content content : contents) {
-            System.out.println(content.getFilenames());
-            System.out.println(content.getFileDescriptions());
-            System.out.println(content.getTags());
-            System.out.println(content.getHash());
-            System.out.println("------------------------------");
-        }
+    public List<Content> getContents() {
+        return contents;
     }
 
     public String getFileHash(File file) {
@@ -143,5 +150,10 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         //return complete hash
         return sb.toString();
+    }
+
+    @Override
+    public byte[] download_file(String hash) {
+        return new byte[0];
     }
 }

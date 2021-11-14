@@ -9,18 +9,31 @@ import java.util.Scanner;
 public class PeerProgram{
     public static void main(String[] args) throws Exception {
         // configurar registry ip i registry port
-        if(args.length <= 1){
-            System.out.println("Creating isolated node...");
+        String own_port = "1099";
+        String other_ip = null;
+        String other_port = "1099";
+        if(args.length == 0){
+            System.out.println("Creating isolated node using port 1099...");
+        }else if (args.length == 1){
+            System.out.println("Creating isolated node using port " + args[0] + "...");
+            own_port = args[0];
         }else if (args.length == 2){
             System.out.println("Creating node connected to " + args[1] + ":1099");
+            own_port = args[0];
+            other_ip = args[1];
         }else{
             System.out.println("Creating node connected to " + args[1] + ":" + args[2]);
+            own_port = args[0];
+            other_port = args[2];
         }
-        String own_port = args[0];
-        String other_ip = args[1];
-        String other_port = args[2];
+        PeerImp peer;
+        if(other_ip != null){
+            PeerInfo other_peer_info = new PeerInfo(other_ip, Integer.parseInt(other_port));
+            peer = new PeerImp(other_peer_info);
+        }else{
+            peer = new PeerImp();
+        }
         Registry reg = startRegistry(Integer.parseInt(own_port));
-        PeerImp peer = new PeerImp();
         InetAddress ia = InetAddress.getLocalHost();
         String ip_str = ia.getHostAddress();
         peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)),reg);
