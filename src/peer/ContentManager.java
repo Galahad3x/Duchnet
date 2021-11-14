@@ -1,5 +1,6 @@
+package peer;
+
 import java.io.*;
-import java.lang.reflect.Array;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -63,7 +64,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         print_contents(this.contents);
     }
 
-    public void print_contents(List<Content> contents){
+    public void print_contents(List<Content> contents) {
         for (Content content : contents) {
             System.out.println(content.getFilenames());
             System.out.println(content.getFileDescriptions());
@@ -80,7 +81,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 if (content.getHash().equals(this_file.getHash())) {
                     found = true;
                     if (!this_file.getFilenames().get(0).equals("")) {
-                        content.add_alternative_name(this_file.getFilenames().get(0));
+                        for (String name : this_file.getFilenames()){
+                            if (!content.getFilenames().contains(name)){
+                                content.add_alternative_name(name);
+                            }
+                        }
                     }
                     for (String desc : this_file.getFileDescriptions()) {
                         if (!desc.equals("") && !content.getFileDescriptions().contains(desc)) {
@@ -154,6 +159,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     @Override
     public byte[] download_file(String hash) {
+        // TODO com ho fem per passar el fitxer?
         return new byte[0];
     }
 }

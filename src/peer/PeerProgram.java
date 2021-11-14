@@ -1,10 +1,11 @@
+package peer;
+
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.Enumeration;
 
 public class PeerProgram{
     public static void main(String[] args) throws Exception {
@@ -24,6 +25,7 @@ public class PeerProgram{
         }else{
             System.out.println("Creating node connected to " + args[1] + ":" + args[2]);
             own_port = args[0];
+            other_ip = args[1];
             other_port = args[2];
         }
         PeerImp peer;
@@ -34,8 +36,17 @@ public class PeerProgram{
             peer = new PeerImp();
         }
         Registry reg = startRegistry(Integer.parseInt(own_port));
-        InetAddress ia = InetAddress.getLocalHost();
-        String ip_str = ia.getHostAddress();
+        Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
+        String ip_str = null;
+        while (e.hasMoreElements()){
+            NetworkInterface n = e.nextElement();
+            if(n.getName().equals("eth0")){
+                Enumeration<InetAddress> adresses = n.getInetAddresses();
+                do {
+                    ip_str = adresses.nextElement().getHostAddress();
+                } while (!ip_str.startsWith("1"));
+            }
+        }
         peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)),reg);
     }
 

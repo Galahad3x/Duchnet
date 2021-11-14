@@ -1,6 +1,9 @@
+package peer;
+
+import java.io.Serializable;
 import java.util.List;
 
-public class Content {
+public class Content implements Serializable {
     private byte[] file_data;
     private final List<String> file_name;
     private final List<String> file_description;
