@@ -34,6 +34,10 @@ public class Content {
         file_description.add(description);
     }
 
+    public void add_tag(String tag) {
+        tags.add(tag);
+    }
+
     public String getHash() {
         return hash;
     }
