@@ -6,6 +6,7 @@ import java.util.List;
 public class Content implements Serializable {
     private byte[] file_data;
     private final List<String> file_name;
+    private String local_route;
     private final List<String> file_description;
     private final String hash;
     private final List<String> tags;
@@ -23,10 +24,6 @@ public class Content implements Serializable {
 
     public void add_alternative_name(String name) {
         file_name.add(name);
-    }
-
-    public byte[] getFiledata() {
-        return file_data;
     }
 
     public List<String> getFileDescriptions() {
@@ -47,5 +44,21 @@ public class Content implements Serializable {
 
     public List<String> getTags() {
         return tags;
+    }
+
+    public String getLocal_route() {
+        return local_route;
+    }
+
+    public void setLocal_route(String local_route) {
+        this.local_route = local_route;
+    }
+
+    public void setFile_data(byte[] file_data) {
+        this.file_data = file_data;
+    }
+
+    public byte[] getFile_data() {
+        return file_data;
     }
 }

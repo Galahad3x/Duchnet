@@ -7,47 +7,47 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Enumeration;
 
-public class PeerProgram{
+public class PeerProgram {
     public static void main(String[] args) throws Exception {
         // configurar registry ip i registry port
         String own_port = "1099";
         String other_ip = null;
         String other_port = "1099";
-        if(args.length == 0){
+        if (args.length == 0) {
             System.out.println("Creating isolated node using port 1099...");
-        }else if (args.length == 1){
+        } else if (args.length == 1) {
             System.out.println("Creating isolated node using port " + args[0] + "...");
             own_port = args[0];
-        }else if (args.length == 2){
+        } else if (args.length == 2) {
             System.out.println("Creating node connected to " + args[1] + ":1099");
             own_port = args[0];
             other_ip = args[1];
-        }else{
+        } else {
             System.out.println("Creating node connected to " + args[1] + ":" + args[2]);
             own_port = args[0];
             other_ip = args[1];
             other_port = args[2];
         }
         PeerImp peer;
-        if(other_ip != null){
+        if (other_ip != null) {
             PeerInfo other_peer_info = new PeerInfo(other_ip, Integer.parseInt(other_port));
             peer = new PeerImp(other_peer_info);
-        }else{
+        } else {
             peer = new PeerImp();
         }
         Registry reg = startRegistry(Integer.parseInt(own_port));
         Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
         String ip_str = null;
-        while (e.hasMoreElements()){
+        while (e.hasMoreElements()) {
             NetworkInterface n = e.nextElement();
-            if(n.getName().equals("eth0")){
+            if (n.getName().equals("eth0")) {
                 Enumeration<InetAddress> adresses = n.getInetAddresses();
                 do {
                     ip_str = adresses.nextElement().getHostAddress();
                 } while (!ip_str.startsWith("1"));
             }
         }
-        peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)),reg);
+        peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)), reg);
     }
 
     /**
@@ -57,20 +57,19 @@ public class PeerProgram{
      */
     private static Registry startRegistry(Integer port)
             throws Exception {
-        if(port == null) {
+        if (port == null) {
             port = 1099;
         }
         try {
             Registry registry = LocateRegistry.getRegistry(port);
-            registry.list( );
+            registry.list();
             // The above call will throw an exception
             // if the registry does not already exist
             throw new Exception("Registry port already in use");
-        }
-        catch (RemoteException ex) {
+        } catch (RemoteException ex) {
             // No valid registry at that port.
             System.out.println("RMI registry cannot be located ");
-            Registry registry= LocateRegistry.createRegistry(port);
+            Registry registry = LocateRegistry.createRegistry(port);
             System.out.println("RMI registry created at port " + port);
             return registry;
         }

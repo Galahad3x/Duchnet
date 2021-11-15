@@ -1,6 +1,8 @@
 package peer;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -40,6 +42,23 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         merge_lists(contents, extra_contents);
     }
 
+    private List<Content> check_inside(File directory){
+        List<Content> contents = new LinkedList<>();
+        for (File file : Objects.requireNonNull(directory.listFiles())) {
+            if (file.isFile()) {
+                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                        new ArrayList<>(),
+                        this.getFileHash(file),
+                        new ArrayList<>());
+                this_file.setLocal_route(file.getAbsolutePath());
+                contents.add(this_file);
+            } else {
+                contents.addAll(check_inside(file));
+            }
+        }
+        return contents;
+    }
+
     /**
      * List all the files read in the folder
      * TODO Save the info on a file for later use (Quality Features: On a database)
@@ -50,18 +69,22 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             File f = new File(this.folder_route);
             List<Content> extra_files = new LinkedList<>();
             for (File file : Objects.requireNonNull(f.listFiles())) {
-                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        new ArrayList<>(),
-                        this.getFileHash(file),
-                        new ArrayList<>());
-                extra_files.add(this_file);
+                if (file.isFile()) {
+                    Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                            new ArrayList<>(),
+                            this.getFileHash(file),
+                            new ArrayList<>());
+                    this_file.setLocal_route(file.getAbsolutePath());
+                    extra_files.add(this_file);
+                } else {
+                    extra_files.addAll(check_inside(file));
+                }
             }
             // TODO Read hash related info in a file or db
             merge_lists(contents, extra_files);
         } else {
             update_files();
         }
-        print_contents(this.contents);
     }
 
     public void print_contents(List<Content> contents) {
@@ -81,8 +104,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 if (content.getHash().equals(this_file.getHash())) {
                     found = true;
                     if (!this_file.getFilenames().get(0).equals("")) {
-                        for (String name : this_file.getFilenames()){
-                            if (!content.getFilenames().contains(name)){
+                        for (String name : this_file.getFilenames()) {
+                            if (!content.getFilenames().contains(name)) {
                                 content.add_alternative_name(name);
                             }
                         }
@@ -158,8 +181,25 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     @Override
-    public byte[] download_file(String hash) {
-        // TODO com ho fem per passar el fitxer?
-        return new byte[0];
+    public Content download_file(String hash) throws Exception {
+        Content to_download = null;
+        for(Content file: this.getContents()){
+            if(file.getHash().equals(hash)){
+                to_download = file;
+            }
+        }
+        if(to_download == null){
+            throw new Exception("Hash not found");
+        }
+        to_download.setFile_data(Files.readAllBytes(Paths.get(to_download.getLocal_route())));
+        return to_download;
+    }
+
+    public void add_content(Content downloaded_file) {
+        this.contents.add(downloaded_file);
+    }
+
+    public String getFolder_route() {
+        return folder_route;
     }
 }
