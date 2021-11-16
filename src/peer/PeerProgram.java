@@ -40,7 +40,7 @@ public class PeerProgram {
         String ip_str = null;
         while (e.hasMoreElements()) {
             NetworkInterface n = e.nextElement();
-            if (n.getName().equals("eth0")) {
+            if (n.getName().equals("eth0") || n.getName().equals("wlan0")) {
                 Enumeration<InetAddress> adresses = n.getInetAddresses();
                 do {
                     ip_str = adresses.nextElement().getHostAddress();
