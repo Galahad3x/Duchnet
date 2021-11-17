@@ -44,7 +44,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     /**
-     *
      * List all the files in folder_route, or let the user add data
      * TODO Save the info on a file for later use (Quality Features: On a database)
      * @param add_data let the user add data or not
@@ -71,6 +70,57 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         } else {
             update_files();
         }
+    }
+
+    public List<Content> filterContents(List<Content> contents, String restriction) {
+        String[] restriction_terms = restriction.split(":");
+        String search_method = restriction_terms[0].toLowerCase();
+        String search_term;
+        if(restriction_terms.length >= 2){
+            search_term = restriction_terms[1].toLowerCase();
+        }else{
+            search_term = "";
+        }
+        List<Content> new_contents = new LinkedList<>();
+        for (Content content : contents){
+            List<String> list_to_check;
+            switch (search_method) {
+                case "description":
+                    list_to_check = content.getFileDescriptions();
+                    break;
+                case "tag":
+                    list_to_check = content.getTags();
+                    break;
+                default:
+                    list_to_check = content.getFilenames();
+                    break;
+            }
+            for (String term : list_to_check){
+                if(term.startsWith(search_term)){
+                    new_contents.add(content);
+                }
+            }
+        }
+        for (Content content : contents){
+            List<String> list_to_check;
+            switch (search_method) {
+                case "description":
+                    list_to_check = content.getFileDescriptions();
+                    break;
+                case "tag":
+                    list_to_check = content.getTags();
+                    break;
+                default:
+                    list_to_check = content.getFilenames();
+                    break;
+            }
+            for (String term : list_to_check){
+                if(term.contains(search_term) && !new_contents.contains(content)){
+                    new_contents.add(content);
+                }
+            }
+        }
+        return new_contents;
     }
 
     /**

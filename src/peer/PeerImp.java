@@ -129,19 +129,23 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     this.manager.print_contents(this.manager.getContents());
                     break;
                 case "help":
-                    System.out.println("quit,list,help,modify,list_all");
+                    System.out.println("quit,list,help,modify,list_all,download");
                     break;
                 case "modify":
                     this.manager.list_files(true);
                     this.manager.print_contents(this.manager.getContents());
                     break;
                 case "list_all":
-                    List<Content> network_contents = this.list_files_all_network(new LinkedList<>());
+                    List<Content> network_contents = this.list_files_all_network(new LinkedList<>(), "name:");
                     this.manager.print_contents(network_contents);
                     break;
                 case "download":
+                    System.out.println("What do you want to search by? Leave blank for name ");
+                    String search_method = scanner.nextLine();
+                    System.out.println("What do you want to search for? ");
+                    String search_term = scanner.nextLine();
                     try {
-                        download_file();
+                        download_file(search_term, search_method);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -150,13 +154,27 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    public void download_file(String search_term, String search_method) throws Exception {
+        if(search_method.equals("")){
+            search_method = "name";
+        }
+        List<Content> network_contents = find_network_contents(search_method + ":" + search_term);
+        Content file_to_download = let_user_choose_file(network_contents);
+        if (file_to_download == null){
+            System.out.println("Error finding the file, cancelling...");
+            return;
+        }
+        fetch_file(file_to_download, file_to_download.getFilenames().get(0));
+    }
+
     /**
      * Lists all the files available in the network, called back recursively
      * @param visited_peers List of all the PeerInfo's visited by this request
+     * @param restriction Restriction of the returned files, looks like description|tag|name:desired data
      * @return List with all the contents with file_data = null;
      * @throws RemoteException if remote calls fail
      */
-    public List<Content> list_files_all_network(List<PeerInfo> visited_peers) throws RemoteException {
+    public List<Content> list_files_all_network(List<PeerInfo> visited_peers, String restriction) throws RemoteException {
         for (PeerInfo info : visited_peers) {
             if (info.toString().equals(this.own_info.toString())) {
                 return new LinkedList<>();
@@ -166,13 +184,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         new_visited_peers.add(this.own_info);
         this.manager.list_files(false);
         List<Content> found_contents = new LinkedList<>(this.manager.getContents());
+        found_contents = this.manager.filterContents(found_contents, restriction);
         for (PeerInfo peer_info : saved_peers_info) {
             if (peer_info.equals(own_info)) {
                 return found_contents;
             }
             Peer peer = saved_peers.get(peer_info.toString());
             // System.out.println("Adding from " + peer_info.toString());
-            ContentManager.merge_lists(found_contents, peer.list_files_all_network(new_visited_peers));
+            ContentManager.merge_lists(found_contents, peer.list_files_all_network(new_visited_peers, restriction));
         }
         List<Content> polished_contents = new LinkedList<>();
         for (Content cnt : found_contents){
@@ -217,49 +236,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         return possible_seeders;
     }
 
-    /**
-     * All the process needed to download a file 1st level;
-     * First list all contents in the network
-     * The user choses a file
-     * Then find possible seeders in the network
-     * Finally download the file from a chosen seeder
-     */
-    public void download_file() throws Exception {
-        // Llistar els fitxers
-        List<Content> network_contents = this.list_files_all_network(new LinkedList<>());
-        this.manager.print_contents(network_contents);
-        // El usuari trie el que vol
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("Type the filename to download, leave blank to cancel: ");
-        String filename = scanner.nextLine();
-        Content file_to_download = null;
-        if (filename.equals("")) {
-            return;
-        } else {
-            List<Content> files_to_download = new LinkedList<>();
-            for (Content content : network_contents) {
-                for (String name : content.getFilenames()) {
-                    if (name.equals(filename)) {
-                        files_to_download.add(content);
-                    }
-                }
-            }
-            if (files_to_download.size() > 1) {
-                System.out.println("Careful: More than one file with the same name!");
-                this.manager.print_contents(files_to_download);
-                System.out.println("Choose the one you want using the hash: ");
-                String chosen_hash = scanner.nextLine();
-                for (Content content : files_to_download) {
-                    if (content.getHash().startsWith(chosen_hash)) {
-                        file_to_download = content;
-                    }
-                }
-            } else if (files_to_download.size() == 0) {
-                return;
-            } else {
-                file_to_download = files_to_download.get(0);
-            }
-        }
+    public List<Content> find_network_contents(String restriction) throws RemoteException {
+        return this.list_files_all_network(new LinkedList<>(), restriction);
+    }
+
+    public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seed(file_to_download, new LinkedList<>());
         assert seeders.size() > 0;
         if(seeders.contains(this.own_info)){
@@ -286,5 +267,54 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         downloaded_file.setFile_data(null);
         this.manager.add_content(downloaded_file);
         System.out.println("File downloaded!");
+    }
+
+    /**
+     * All the process needed to download a file 1st level;
+     * First list all contents in the network
+     * The user choses a file
+     * Then find possible seeders in the network
+     * Finally download the file from a chosen seeder
+     */
+    public Content let_user_choose_file(List<Content> network_contents) throws Exception {
+        // El usuari trie el que vol
+        this.manager.print_contents(network_contents);
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Type the filename to download, leave blank to cancel: ");
+        String filename = scanner.nextLine();
+        Content file_to_download = null;
+        if (filename.equals("")) {
+            return null;
+        } else {
+            List<Content> files_to_download = new LinkedList<>();
+            for (Content content : network_contents) {
+                for (String name : content.getFilenames()) {
+                    if (name.equals(filename)) {
+                        files_to_download.add(content);
+                    }
+                }
+            }
+            if (files_to_download.size() > 1) {
+                System.out.println("Careful: More than one file with the same name!");
+                this.manager.print_contents(files_to_download);
+                System.out.println("Choose the one you want using the hash: ");
+                String chosen_hash = scanner.nextLine();
+                for (Content content : files_to_download) {
+                    if (content.getHash().startsWith(chosen_hash)) {
+                        file_to_download = content;
+                    }
+                }
+            } else if (files_to_download.size() == 0) {
+                return null;
+            } else {
+                file_to_download = files_to_download.get(0);
+            }
+        }
+        if(file_to_download == null){
+            return null;
+        }
+        file_to_download.getFilenames().remove(filename);
+        file_to_download.getFilenames().add(0, filename);
+        return file_to_download;
     }
 }
