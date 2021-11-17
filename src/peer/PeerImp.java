@@ -10,21 +10,54 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 
 public class PeerImp extends UnicastRemoteObject implements Peer {
-    private final List<PeerInfo> saved_peers_info = new ArrayList<>();
-    private final HashMap<String, Peer> saved_peers = new HashMap<>();
-    private final HashMap<String, Manager> saved_managers = new HashMap<>();
-    private PeerInfo own_info;
 
+    /**
+     * List of all the peers that the program has the Peers and Managers referenced
+     */
+    private final List<PeerInfo> saved_peers_info = new ArrayList<>();
+    /**
+     * HashMap where Peer references are stored using their PeerInfo.toString();
+     */
+    private final HashMap<String, Peer> saved_peers = new HashMap<>();
+    /**
+     * HashMap where Manager references are stored using their PeerInfo.toString();
+     */
+    private final HashMap<String, Manager> saved_managers = new HashMap<>();
+
+    /**
+     * The PeerInfo of this peer
+     */
+    private PeerInfo own_info;
+    /**
+     * The Manager of this peer
+     */
     private ContentManager manager;
+    /**
+     * The Registry of this peer
+     */
     public Registry registry;
 
+    /**
+     * Constructor used for isolated nodes
+     * @throws RemoteException When Remote calls fail
+     */
     protected PeerImp() throws RemoteException {
     }
 
+    /**
+     * Constructor used for nodes connected to another node
+     * @param node_peer_info the PeerInfo of the other node
+     * @throws RemoteException When remote calls fail
+     */
     protected PeerImp(PeerInfo node_peer_info) throws RemoteException {
         this.saved_peers_info.add(node_peer_info);
     }
 
+    /**
+     * Add the Peer and Manager of another node, not remote
+     * @param info The PeerInfo of this other node
+     * @throws RemoteException When remote calls fail
+     */
     public void add_node(PeerInfo info) throws RemoteException {
         try {
             this.add_node_components(info);
@@ -34,6 +67,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    /**
+     * Locally: Fetch the Peer and Manager of another node
+     * Remotely: When called back remotely with this.own_info as a parameter,
+     * used for offering its own Peer and Manager to a node
+     * @param node_peer_info the PeerInfo of the offered Peer and Manager
+     * @throws RemoteException when remote calls fail
+     * @throws NotBoundException when "peer" and "manager" are not in node_peer_info's registry
+     */
     public void add_node_components(PeerInfo node_peer_info) throws RemoteException, NotBoundException {
         Registry registry = LocateRegistry.getRegistry(node_peer_info.ip, node_peer_info.port);
         Peer peer = (Peer) registry.lookup("peer");
@@ -42,6 +83,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         this.saved_managers.put(node_peer_info.toString(), manager);
     }
 
+    /**
+     * Setup function for a node;
+     * Locate the files and bind the own Peer and Manager
+     * @param own_info the PeerInfo of the node we are building
+     * @param reg the Registry of the node we are building
+     * @throws IOException if the Scanner fails
+     * @throws NotBoundException if looking up a remote node fails
+     */
     public void start(PeerInfo own_info, Registry reg) throws IOException, NotBoundException {
         // configurar registry ip i registry port
         this.own_info = own_info;
@@ -64,6 +113,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
      * Service loop of the peer, runs forever until closed by the user
+     * Listens for commands
      */
     public void service_loop() throws RemoteException {
         Scanner scanner = new Scanner(System.in);
@@ -101,7 +151,78 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     }
 
     /**
-     * All the process needed to download a file 1st level
+     * Lists all the files available in the network, called back recursively
+     * @param visited_peers List of all the PeerInfo's visited by this request
+     * @return List with all the contents with file_data = null;
+     * @throws RemoteException if remote calls fail
+     */
+    public List<Content> list_files_all_network(List<PeerInfo> visited_peers) throws RemoteException {
+        for (PeerInfo info : visited_peers) {
+            if (info.toString().equals(this.own_info.toString())) {
+                return new LinkedList<>();
+            }
+        }
+        List<PeerInfo> new_visited_peers = new LinkedList<>(visited_peers);
+        new_visited_peers.add(this.own_info);
+        this.manager.list_files(false);
+        List<Content> found_contents = new LinkedList<>(this.manager.getContents());
+        for (PeerInfo peer_info : saved_peers_info) {
+            if (peer_info.equals(own_info)) {
+                return found_contents;
+            }
+            Peer peer = saved_peers.get(peer_info.toString());
+            // System.out.println("Adding from " + peer_info.toString());
+            ContentManager.merge_lists(found_contents, peer.list_files_all_network(new_visited_peers));
+        }
+        List<Content> polished_contents = new LinkedList<>();
+        for (Content cnt : found_contents){
+            if (!polished_contents.contains(cnt)){
+                polished_contents.add(cnt);
+            }
+        }
+        return polished_contents;
+    }
+
+    /**
+     * Find nodes that own a certain file
+     * @param file the file we are looking for
+     * @param visited_peers List of all the PeerInfo's visited by this request
+     * @return List of all the PeerInfo's that own the file
+     * @throws RemoteException if remote calls fail
+     */
+    public List<PeerInfo> find_seed(Content file, List<PeerInfo> visited_peers) throws RemoteException {
+        for (PeerInfo info : visited_peers) {
+            if (info.toString().equals(this.own_info.toString())) {
+                return new LinkedList<>();
+            }
+        }
+        List<PeerInfo> new_visited_peers = new LinkedList<>(visited_peers);
+        new_visited_peers.add(this.own_info);
+        List<Content> user_contents = new LinkedList<>(this.manager.getContents());
+        List<PeerInfo> possible_seeders = new LinkedList<>();
+        for (Content content : user_contents){
+            if (content.getHash().equals(file.getHash())){
+                possible_seeders.add(this.own_info);
+            }
+        }
+        for (PeerInfo peer_info : saved_peers_info) {
+            Peer peer = saved_peers.get(peer_info.toString());
+            List<PeerInfo> peer_result = peer.find_seed(file, new_visited_peers);
+            for (PeerInfo peer_found_seeder : peer_result){
+                if (!possible_seeders.contains(peer_found_seeder)){
+                    possible_seeders.add(peer_found_seeder);
+                }
+            }
+        }
+        return possible_seeders;
+    }
+
+    /**
+     * All the process needed to download a file 1st level;
+     * First list all contents in the network
+     * The user choses a file
+     * Then find possible seeders in the network
+     * Finally download the file from a chosen seeder
      */
     public void download_file() throws Exception {
         // Llistar els fitxers
@@ -165,72 +286,5 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         downloaded_file.setFile_data(null);
         this.manager.add_content(downloaded_file);
         System.out.println("File downloaded!");
-    }
-
-    /**
-     * List all the files available in the network
-     */
-    public List<Content> list_files_all_network(List<PeerInfo> visited_peers) throws RemoteException {
-        for (PeerInfo info : visited_peers) {
-            if (info.toString().equals(this.own_info.toString())) {
-                return new LinkedList<>();
-            }
-        }
-        List<PeerInfo> new_visited_peers = new LinkedList<>(visited_peers);
-        new_visited_peers.add(this.own_info);
-        this.manager.list_files(false);
-        List<Content> found_contents = new LinkedList<>(this.manager.getContents());
-        for (PeerInfo peer_info : saved_peers_info) {
-            if (peer_info.equals(own_info)) {
-                return found_contents;
-            }
-            Peer peer = saved_peers.get(peer_info.toString());
-            // System.out.println("Adding from " + peer_info.toString());
-            ContentManager.merge_lists(found_contents, peer.list_files_all_network(new_visited_peers));
-        }
-        List<Content> polished_contents = new LinkedList<>();
-        for (Content cnt : found_contents){
-            if (!polished_contents.contains(cnt)){
-                polished_contents.add(cnt);
-            }
-        }
-        return polished_contents;
-    }
-
-    public List<PeerInfo> find_seed(Content file, List<PeerInfo> visited_peers) throws RemoteException {
-        for (PeerInfo info : visited_peers) {
-            if (info.toString().equals(this.own_info.toString())) {
-                return new LinkedList<>();
-            }
-        }
-        List<PeerInfo> new_visited_peers = new LinkedList<>(visited_peers);
-        new_visited_peers.add(this.own_info);
-        List<Content> user_contents = new LinkedList<>(this.manager.getContents());
-        List<PeerInfo> possible_seeders = new LinkedList<>();
-        for (Content content : user_contents){
-            if (content.getHash().equals(file.getHash())){
-                possible_seeders.add(this.own_info);
-            }
-        }
-        for (PeerInfo peer_info : saved_peers_info) {
-            Peer peer = saved_peers.get(peer_info.toString());
-            List<PeerInfo> peer_result = peer.find_seed(file, new_visited_peers);
-            for (PeerInfo peer_found_seeder : peer_result){
-                if (!possible_seeders.contains(peer_found_seeder)){
-                    possible_seeders.add(peer_found_seeder);
-                }
-            }
-        }
-        return possible_seeders;
-    }
-
-    /**
-     * Share the own IP and PORT to another node
-     */
-    public PeerInfo share_address() {
-        if (own_info.ip.equals("")) {
-            return null;
-        }
-        return this.own_info;
     }
 }

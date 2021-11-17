@@ -8,6 +8,11 @@ import java.rmi.registry.Registry;
 import java.util.Enumeration;
 
 public class PeerProgram {
+    /**
+     * Execute a node
+     * @param args args of the program [own_port] [other_ip] [other_port]
+     * @throws Exception if something fails
+     */
     public static void main(String[] args) throws Exception {
         // configurar registry ip i registry port
         String own_port = "1099";

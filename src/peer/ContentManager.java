@@ -11,57 +11,43 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
+    /**
+     * The route where we take files from and where we will save the ones we download
+     */
     private final String folder_route;
+    /**
+     * List of all Contents, without file_data
+     */
     private final List<Content> contents;
 
+    /**
+     * Constructor for ContentManager
+     * @param folder_route the route of the folder
+     * @throws RemoteException when remote calls fail
+     */
     public ContentManager(String folder_route) throws RemoteException {
         super();
         this.folder_route = folder_route;
         this.contents = new ArrayList<>();
     }
 
-    /**
-     * List all the files in the folder while letting the user add descriptions and tags
-     */
-    private void update_files() {
-        File f = new File(this.folder_route);
-        List<Content> extra_contents = new LinkedList<>();
-        for (File file : Objects.requireNonNull(f.listFiles())) {
-            System.out.println("File name: " + file.getName());
-            Scanner scanner = new Scanner(System.in);
-            System.out.println("Type descriptions separated by , or leave blank: ");
-            String[] descriptions = scanner.nextLine().split(",");
-            System.out.println("Type tags separated by , or leave blank: ");
-            String[] tags = scanner.nextLine().split(",");
-            Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                    Arrays.asList(descriptions),
-                    this.getFileHash(file),
-                    Arrays.asList(tags));
-            extra_contents.add(this_file);
-        }
-        merge_lists(contents, extra_contents);
+    public String getFolder_route() {
+        return folder_route;
     }
 
-    private List<Content> check_inside(File directory){
-        List<Content> contents = new LinkedList<>();
-        for (File file : Objects.requireNonNull(directory.listFiles())) {
-            if (file.isFile()) {
-                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        new ArrayList<>(),
-                        this.getFileHash(file),
-                        new ArrayList<>());
-                this_file.setLocal_route(file.getAbsolutePath());
-                contents.add(this_file);
-            } else {
-                contents.addAll(check_inside(file));
-            }
-        }
+    public List<Content> getContents() {
         return contents;
     }
 
+    public void add_content(Content downloaded_file) {
+        this.contents.add(downloaded_file);
+    }
+
     /**
-     * List all the files read in the folder
+     *
+     * List all the files in folder_route, or let the user add data
      * TODO Save the info on a file for later use (Quality Features: On a database)
+     * @param add_data let the user add data or not
      */
     public void list_files(boolean add_data) {
         // Just list local files
@@ -87,6 +73,54 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
     }
 
+    /**
+     * List all the files inside directories found inside the folder_route recursively
+     * @param directory the File of the directory
+     * @return List of all contents in the directory, including inside other directories
+     */
+    private List<Content> check_inside(File directory){
+        List<Content> contents = new LinkedList<>();
+        for (File file : Objects.requireNonNull(directory.listFiles())) {
+            if (file.isFile()) {
+                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                        new ArrayList<>(),
+                        this.getFileHash(file),
+                        new ArrayList<>());
+                this_file.setLocal_route(file.getAbsolutePath());
+                contents.add(this_file);
+            } else {
+                contents.addAll(check_inside(file));
+            }
+        }
+        return contents;
+    }
+
+    /**
+     * List all the files in the folder while letting the user add descriptions and tags
+     */
+    private void update_files() {
+        File f = new File(this.folder_route);
+        List<Content> extra_contents = new LinkedList<>();
+        for (File file : Objects.requireNonNull(f.listFiles())) {
+            System.out.println("File name: " + file.getName());
+            Scanner scanner = new Scanner(System.in);
+            System.out.println("Type descriptions separated by , or leave blank: ");
+            String[] descriptions = scanner.nextLine().split(",");
+            System.out.println("Type tags separated by , or leave blank: ");
+            String[] tags = scanner.nextLine().split(",");
+            Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                    Arrays.asList(descriptions),
+                    this.getFileHash(file),
+                    Arrays.asList(tags));
+            extra_contents.add(this_file);
+        }
+        merge_lists(contents, extra_contents);
+    }
+
+    /**
+     * Print a list of contents
+     * @param contents the list to print
+     */
     public void print_contents(List<Content> contents) {
         for (Content content : contents) {
             System.out.println(content.getFilenames());
@@ -97,6 +131,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
     }
 
+    /**
+     * Merge two content lists, merging same files into a single Content
+     * @param original The original list and the one returned
+     * @param extra The files to add to original
+     */
     public static void merge_lists(List<Content> original, List<Content> extra) {
         for (Content this_file : extra) {
             boolean found = false;
@@ -128,10 +167,33 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
     }
 
-    public List<Content> getContents() {
-        return contents;
+    /**
+     * Given a hash, return the Content with a file_data, called remotely
+     * @param hash the hash of the file to return
+     * @return a Content with its file_data
+     * @throws Exception if something fails
+     */
+    //TODO Send files by slices
+    @Override
+    public Content download_file(String hash) throws Exception {
+        Content to_download = null;
+        for(Content file: this.getContents()){
+            if(file.getHash().equals(hash)){
+                to_download = file;
+            }
+        }
+        if(to_download == null){
+            throw new Exception("Hash not found");
+        }
+        to_download.setFile_data(Files.readAllBytes(Paths.get(to_download.getLocal_route())));
+        return to_download;
     }
 
+    /**
+     * Get the hash of a file
+     * @param file the file
+     * @return SHA256 hash of a file
+     */
     public String getFileHash(File file) {
         MessageDigest shaDigest = null;
         try {
@@ -178,28 +240,5 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         //return complete hash
         return sb.toString();
-    }
-
-    @Override
-    public Content download_file(String hash) throws Exception {
-        Content to_download = null;
-        for(Content file: this.getContents()){
-            if(file.getHash().equals(hash)){
-                to_download = file;
-            }
-        }
-        if(to_download == null){
-            throw new Exception("Hash not found");
-        }
-        to_download.setFile_data(Files.readAllBytes(Paths.get(to_download.getLocal_route())));
-        return to_download;
-    }
-
-    public void add_content(Content downloaded_file) {
-        this.contents.add(downloaded_file);
-    }
-
-    public String getFolder_route() {
-        return folder_route;
     }
 }
