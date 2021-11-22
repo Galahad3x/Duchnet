@@ -2,6 +2,7 @@ package peer;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.time.LocalDateTime;
 
 public interface Manager extends Remote {
     /**
@@ -10,5 +11,6 @@ public interface Manager extends Remote {
      * @return a Content with its file_data
      * @throws Exception if something fails
      */
-    Content download_file(String hash) throws Exception;
+    byte[] get_slice(String hash, Integer slice) throws Exception;
+    Integer getSlicesNeeded(String hash) throws Exception;
 }

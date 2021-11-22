@@ -20,7 +20,7 @@ public interface Peer extends Remote {
      * @return List with all the contents with file_data = null;
      * @throws RemoteException if remote calls fail
      */
-    List<Content> list_files_all_network(List<PeerInfo> visited_peers, String restriction) throws RemoteException;
+    List<Content> find_network_contents(List<PeerInfo> visited_peers, String restriction) throws RemoteException;
 
     /**
      * Find nodes that own a certain file

@@ -39,6 +39,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
      * Constructor used for isolated nodes
+     *
      * @throws RemoteException When Remote calls fail
      */
     protected PeerImp() throws RemoteException {
@@ -46,6 +47,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
      * Constructor used for nodes connected to another node
+     *
      * @param node_peer_info the PeerInfo of the other node
      * @throws RemoteException When remote calls fail
      */
@@ -55,6 +57,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
      * Add the Peer and Manager of another node, not remote
+     *
      * @param info The PeerInfo of this other node
      * @throws RemoteException When remote calls fail
      */
@@ -71,8 +74,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * Locally: Fetch the Peer and Manager of another node
      * Remotely: When called back remotely with this.own_info as a parameter,
      * used for offering its own Peer and Manager to a node
+     *
      * @param node_peer_info the PeerInfo of the offered Peer and Manager
-     * @throws RemoteException when remote calls fail
+     * @throws RemoteException   when remote calls fail
      * @throws NotBoundException when "peer" and "manager" are not in node_peer_info's registry
      */
     public void add_node_components(PeerInfo node_peer_info) throws RemoteException, NotBoundException {
@@ -86,9 +90,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     /**
      * Setup function for a node;
      * Locate the files and bind the own Peer and Manager
+     *
      * @param own_info the PeerInfo of the node we are building
-     * @param reg the Registry of the node we are building
-     * @throws IOException if the Scanner fails
+     * @param reg      the Registry of the node we are building
+     * @throws IOException       if the Scanner fails
      * @throws NotBoundException if looking up a remote node fails
      */
     public void start(PeerInfo own_info, Registry reg) throws IOException, NotBoundException {
@@ -106,10 +111,12 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             Peer original_peer = saved_peers.get(saved_peers_info.get(0).toString());
             original_peer.add_node(this.own_info);
         }
-        this.manager.list_files(false);
+        // this.manager.list_files(false);
         System.out.println("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
         this.service_loop();
     }
+
+    // TODO Clean and standardize the CLI
 
     /**
      * Service loop of the peer, runs forever until closed by the user
@@ -136,7 +143,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     this.manager.print_contents(this.manager.getContents());
                     break;
                 case "list_all":
-                    List<Content> network_contents = this.list_files_all_network(new LinkedList<>(), "name:");
+                    List<Content> network_contents = this.find_network_contents(new LinkedList<>(), "name:");
                     this.manager.print_contents(network_contents);
                     break;
                 case "download":
@@ -154,13 +161,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    // TODO Error handling this function
     public void download_file(String search_term, String search_method) throws Exception {
-        if(search_method.equals("")){
+        if (search_method.equals("")) {
             search_method = "name";
         }
-        List<Content> network_contents = find_network_contents(search_method + ":" + search_term);
+        List<Content> network_contents = find_network_contents(new LinkedList<>(), search_method + ":" + search_term);
         Content file_to_download = let_user_choose_file(network_contents);
-        if (file_to_download == null){
+        if (file_to_download == null) {
             System.out.println("Error finding the file, cancelling...");
             return;
         }
@@ -169,12 +177,13 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
      * Lists all the files available in the network, called back recursively
+     *
      * @param visited_peers List of all the PeerInfo's visited by this request
-     * @param restriction Restriction of the returned files, looks like description|tag|name:desired data
+     * @param restriction   Restriction of the returned files, looks like description|tag|name:desired data
      * @return List with all the contents with file_data = null;
      * @throws RemoteException if remote calls fail
      */
-    public List<Content> list_files_all_network(List<PeerInfo> visited_peers, String restriction) throws RemoteException {
+    public List<Content> find_network_contents(List<PeerInfo> visited_peers, String restriction) throws RemoteException {
         for (PeerInfo info : visited_peers) {
             if (info.toString().equals(this.own_info.toString())) {
                 return new LinkedList<>();
@@ -182,29 +191,24 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
         List<PeerInfo> new_visited_peers = new LinkedList<>(visited_peers);
         new_visited_peers.add(this.own_info);
-        this.manager.list_files(false);
+        this.manager.list_filtered_files(restriction);
         List<Content> found_contents = new LinkedList<>(this.manager.getContents());
-        found_contents = this.manager.filterContents(found_contents, restriction);
+        found_contents = this.manager.filter_contents(found_contents, restriction);
         for (PeerInfo peer_info : saved_peers_info) {
             if (peer_info.equals(own_info)) {
                 return found_contents;
             }
             Peer peer = saved_peers.get(peer_info.toString());
             // System.out.println("Adding from " + peer_info.toString());
-            ContentManager.merge_lists(found_contents, peer.list_files_all_network(new_visited_peers, restriction));
+            ContentManager.merge_lists(found_contents, peer.find_network_contents(new_visited_peers, restriction));
         }
-        List<Content> polished_contents = new LinkedList<>();
-        for (Content cnt : found_contents){
-            if (!polished_contents.contains(cnt)){
-                polished_contents.add(cnt);
-            }
-        }
-        return polished_contents;
+        return found_contents;
     }
 
     /**
      * Find nodes that own a certain file
-     * @param file the file we are looking for
+     *
+     * @param file          the file we are looking for
      * @param visited_peers List of all the PeerInfo's visited by this request
      * @return List of all the PeerInfo's that own the file
      * @throws RemoteException if remote calls fail
@@ -219,16 +223,16 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         new_visited_peers.add(this.own_info);
         List<Content> user_contents = new LinkedList<>(this.manager.getContents());
         List<PeerInfo> possible_seeders = new LinkedList<>();
-        for (Content content : user_contents){
-            if (content.getHash().equals(file.getHash())){
+        for (Content content : user_contents) {
+            if (content.getHash().equals(file.getHash())) {
                 possible_seeders.add(this.own_info);
             }
         }
         for (PeerInfo peer_info : saved_peers_info) {
             Peer peer = saved_peers.get(peer_info.toString());
             List<PeerInfo> peer_result = peer.find_seed(file, new_visited_peers);
-            for (PeerInfo peer_found_seeder : peer_result){
-                if (!possible_seeders.contains(peer_found_seeder)){
+            for (PeerInfo peer_found_seeder : peer_result) {
+                if (!possible_seeders.contains(peer_found_seeder)) {
                     possible_seeders.add(peer_found_seeder);
                 }
             }
@@ -236,47 +240,60 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         return possible_seeders;
     }
 
-    public List<Content> find_network_contents(String restriction) throws RemoteException {
-        return this.list_files_all_network(new LinkedList<>(), restriction);
-    }
-
+    /**
+     * Fetch a file from a remote host
+     *
+     * @param file_to_download The file to download, without filedata
+     * @param filename         The filename to save the file in
+     * @throws Exception if something fails
+     */
     public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seed(file_to_download, new LinkedList<>());
         assert seeders.size() > 0;
-        if(seeders.contains(this.own_info)){
+        if (seeders.contains(this.own_info)) {
             System.out.println("You already own this file! Aborting...");
             return;
         }
         Manager seed_manager = null;
-        for(PeerInfo peer_info : seeders){
-            if (this.saved_peers_info.contains(peer_info)){
+        for (PeerInfo peer_info : seeders) {
+            if (this.saved_peers_info.contains(peer_info)) {
                 seed_manager = saved_managers.get(peer_info.toString());
             }
         }
-        if (seed_manager == null){
+        if (seed_manager == null) {
             add_node_components(seeders.get(0));
             seed_manager = saved_managers.get(seeders.get(0).toString());
         }
         assert file_to_download != null;
         String file_location = this.manager.getFolder_route() + "/" + filename;
         System.out.println("Starting to download the file... ");
-        Content downloaded_file = seed_manager.download_file(file_to_download.getHash());
+        // Find number of slices needed
+        Integer slices = seed_manager.getSlicesNeeded(file_to_download.getHash());
+        System.out.println("Need " + slices + " slices");
+        // For number of slices request the file with the slice
+        Content downloaded_file = null;
         try (FileOutputStream stream = new FileOutputStream(file_location)) {
-            stream.write(downloaded_file.getFile_data());
+            for (int i = 0; i < slices; i++) {
+                stream.write(seed_manager.get_slice(file_to_download.getHash(), i));
+            }
         }
-        downloaded_file.setFile_data(null);
-        this.manager.add_content(downloaded_file);
-        System.out.println("File downloaded!");
+        try {
+            assert downloaded_file != null;
+            downloaded_file.setFile_data(null);
+            this.manager.add_content(downloaded_file);
+            System.out.println("File downloaded!");
+        } catch (NullPointerException e) {
+            System.out.println("File failed to download!");
+        }
     }
 
     /**
-     * All the process needed to download a file 1st level;
-     * First list all contents in the network
-     * The user choses a file
-     * Then find possible seeders in the network
-     * Finally download the file from a chosen seeder
+     * Get the input of the user to know which file to download
+     *
+     * @param network_contents contents the user can choose from
+     * @return the content the user chose
      */
-    public Content let_user_choose_file(List<Content> network_contents) throws Exception {
+    public Content let_user_choose_file(List<Content> network_contents) {
         // El usuari trie el que vol
         this.manager.print_contents(network_contents);
         Scanner scanner = new Scanner(System.in);
@@ -310,7 +327,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 file_to_download = files_to_download.get(0);
             }
         }
-        if(file_to_download == null){
+        if (file_to_download == null) {
             return null;
         }
         file_to_download.getFilenames().remove(filename);

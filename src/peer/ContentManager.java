@@ -1,14 +1,14 @@
 package peer;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
 
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
     /**
@@ -19,9 +19,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * List of all Contents, without file_data
      */
     private final List<Content> contents;
+    private final int slice_size = 1000;
 
     /**
      * Constructor for ContentManager
+     *
      * @param folder_route the route of the folder
      * @throws RemoteException when remote calls fail
      */
@@ -46,6 +48,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     /**
      * List all the files in folder_route, or let the user add data
      * TODO Save the info on a file for later use (Quality Features: On a database)
+     *
      * @param add_data let the user add data or not
      */
     public void list_files(boolean add_data) {
@@ -55,14 +58,20 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             List<Content> extra_files = new LinkedList<>();
             for (File file : Objects.requireNonNull(f.listFiles())) {
                 if (file.isFile()) {
-                    Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                            new ArrayList<>(),
-                            this.getFileHash(file),
-                            new ArrayList<>());
+                    Content this_file = null;
+                    try {
+                        this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                                new ArrayList<>(),
+                                HashCalculator.getFileHash(file),
+                                new ArrayList<>());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    assert this_file != null;
                     this_file.setLocal_route(file.getAbsolutePath());
                     extra_files.add(this_file);
                 } else {
-                    extra_files.addAll(check_inside(file));
+                    extra_files.addAll(check_inside(file, null));
                 }
             }
             // TODO Read hash related info in a file or db
@@ -72,17 +81,62 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
     }
 
-    public List<Content> filterContents(List<Content> contents, String restriction) {
+    /**
+     * Update files skipping the ones that don't satisfy the name restriction
+     *
+     * @param restriction the restriction to satisfy
+     */
+    public void list_filtered_files(String restriction) {
+        File f = new File(this.folder_route);
+        List<Content> extra_files = new LinkedList<>();
+        FileFilter filter = file -> {
+            String restriction_method = restriction.split(":")[0];
+            String restriction_term = restriction.split(":")[1];
+            if (restriction_method.equals("name")) {
+                return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
+            }
+            return true;
+        };
+        for (File file : Objects.requireNonNull(f.listFiles(filter))) {
+            if (file.isFile()) {
+                Content this_file = null;
+                try {
+                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                            new ArrayList<>(),
+                            HashCalculator.getFileHash(file),
+                            new ArrayList<>());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                assert this_file != null;
+                this_file.setLocal_route(file.getAbsolutePath());
+                extra_files.add(this_file);
+            } else {
+                extra_files.addAll(check_inside(file, filter));
+            }
+        }
+        // TODO Read hash related info in a file or db
+        merge_lists(contents, extra_files);
+    }
+
+    /**
+     * Filter a list of contents according to restriction
+     *
+     * @param contents    The original list of contents
+     * @param restriction A restriction of the form name|description|tag:search_term
+     * @return Contents that satisfy the condition
+     */
+    public List<Content> filter_contents(List<Content> contents, String restriction) {
         String[] restriction_terms = restriction.split(":");
         String search_method = restriction_terms[0].toLowerCase();
         String search_term;
-        if(restriction_terms.length >= 2){
+        if (restriction_terms.length >= 2) {
             search_term = restriction_terms[1].toLowerCase();
-        }else{
-            search_term = "";
+        } else {
+            return contents;
         }
         List<Content> new_contents = new LinkedList<>();
-        for (Content content : contents){
+        for (Content content : contents) {
             List<String> list_to_check;
             switch (search_method) {
                 case "description":
@@ -93,15 +147,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     break;
                 default:
                     list_to_check = content.getFilenames();
-                    break;
             }
-            for (String term : list_to_check){
-                if(term.startsWith(search_term)){
+            for (String term : list_to_check) {
+                if (term.toLowerCase().startsWith(search_term.toLowerCase())) {
                     new_contents.add(content);
                 }
             }
         }
-        for (Content content : contents){
+        for (Content content : contents) {
             List<String> list_to_check;
             switch (search_method) {
                 case "description":
@@ -112,10 +165,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     break;
                 default:
                     list_to_check = content.getFilenames();
-                    break;
             }
-            for (String term : list_to_check){
-                if(term.contains(search_term) && !new_contents.contains(content)){
+            for (String term : list_to_check) {
+                if (term.toLowerCase().contains(search_term.toLowerCase()) && !new_contents.contains(content)) {
                     new_contents.add(content);
                 }
             }
@@ -125,21 +177,29 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * List all the files inside directories found inside the folder_route recursively
+     *
      * @param directory the File of the directory
      * @return List of all contents in the directory, including inside other directories
      */
-    private List<Content> check_inside(File directory){
+    private List<Content> check_inside(File directory, FileFilter filter) {
         List<Content> contents = new LinkedList<>();
-        for (File file : Objects.requireNonNull(directory.listFiles())) {
+        if (filter == null) filter = file -> true;
+        for (File file : Objects.requireNonNull(directory.listFiles(filter))) {
             if (file.isFile()) {
-                Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        new ArrayList<>(),
-                        this.getFileHash(file),
-                        new ArrayList<>());
+                Content this_file = null;
+                try {
+                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                            new ArrayList<>(),
+                            HashCalculator.getFileHash(file),
+                            new ArrayList<>());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                assert this_file != null;
                 this_file.setLocal_route(file.getAbsolutePath());
                 contents.add(this_file);
             } else {
-                contents.addAll(check_inside(file));
+                contents.addAll(check_inside(file, null));
             }
         }
         return contents;
@@ -158,10 +218,15 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             String[] descriptions = scanner.nextLine().split(",");
             System.out.println("Type tags separated by , or leave blank: ");
             String[] tags = scanner.nextLine().split(",");
-            Content this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                    Arrays.asList(descriptions),
-                    this.getFileHash(file),
-                    Arrays.asList(tags));
+            Content this_file = null;
+            try {
+                this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
+                        Arrays.asList(descriptions),
+                        HashCalculator.getFileHash(file),
+                        Arrays.asList(tags));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             extra_contents.add(this_file);
         }
         merge_lists(contents, extra_contents);
@@ -169,6 +234,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * Print a list of contents
+     *
      * @param contents the list to print
      */
     public void print_contents(List<Content> contents) {
@@ -183,8 +249,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * Merge two content lists, merging same files into a single Content
+     *
      * @param original The original list and the one returned
-     * @param extra The files to add to original
+     * @param extra    The files to add to original
      */
     public static void merge_lists(List<Content> original, List<Content> extra) {
         for (Content this_file : extra) {
@@ -219,76 +286,54 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * Given a hash, return the Content with a file_data, called remotely
+     *
      * @param hash the hash of the file to return
      * @return a Content with its file_data
      * @throws Exception if something fails
      */
-    //TODO Send files by slices
+    // TODO Parallelize download slices
     @Override
-    public Content download_file(String hash) throws Exception {
+    public byte[] get_slice(String hash, Integer slice_index) throws Exception {
+        System.out.println("Downloading " + hash + " slice " + slice_index);
+        System.out.print(Runtime.getRuntime().maxMemory());
+        System.out.print(" ");
+        System.out.println(Runtime.getRuntime().freeMemory());
         Content to_download = null;
-        for(Content file: this.getContents()){
-            if(file.getHash().equals(hash)){
+        for (Content file : this.getContents()) {
+            if (file.getHash().equals(hash)) {
                 to_download = file;
             }
         }
-        if(to_download == null){
+        if (to_download == null) {
             throw new Exception("Hash not found");
         }
-        to_download.setFile_data(Files.readAllBytes(Paths.get(to_download.getLocal_route())));
-        return to_download;
+        File file = new File(to_download.getLocal_route());
+        byte[] bytes;
+        synchronized (this) {
+            bytes = new byte[slice_size];
+            try (FileInputStream fis = new FileInputStream(file)) {
+                try {
+                    int read = fis.read(bytes, slice_index * slice_size, slice_size);
+                } catch (IndexOutOfBoundsException e) {
+                    bytes = fis.readNBytes((int) file.length() - slice_index * slice_size);
+                }
+            }
+        }
+        return bytes;
     }
 
-    /**
-     * Get the hash of a file
-     * @param file the file
-     * @return SHA256 hash of a file
-     */
-    public String getFileHash(File file) {
-        MessageDigest shaDigest = null;
-        try {
-            shaDigest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+    @Override
+    public Integer getSlicesNeeded(String hash) throws Exception {
+        Content to_download = null;
+        for (Content file : this.getContents()) {
+            if (file.getHash().equals(hash)) {
+                to_download = file;
+            }
         }
-        String shaChecksum = null;
-        try {
-            shaChecksum = getFileChecksum(shaDigest, file);
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (to_download == null) {
+            throw new Exception("Hash not found");
         }
-        return shaChecksum;
-    }
-
-    /**
-     * Hash function from the Internet
-     */
-    private static String getFileChecksum(MessageDigest digest, File file) throws IOException {
-        //Get file input stream for reading the file content
-        FileInputStream fis = new FileInputStream(file);
-
-        //Create byte array to read data in chunks
-        byte[] byteArray = new byte[1024];
-        int bytesCount;
-
-        //Read file data and update in message digest
-        while ((bytesCount = fis.read(byteArray)) != -1) {
-            digest.update(byteArray, 0, bytesCount);
-        }
-
-        //close the stream; We don't need it now.
-        fis.close();
-
-        //Get the hash's bytes
-        byte[] bytes = digest.digest();
-
-        //This bytes[] has bytes in decimal format;
-        //Convert it to hexadecimal format
-        StringBuilder sb = new StringBuilder();
-        for (byte aByte : bytes) {
-            sb.append(Integer.toString((aByte & 0xff) + 0x100, 16).substring(1));
-        }
-        //return complete hash
-        return sb.toString();
+        File file = new File(to_download.getLocal_route());
+        return ((int) Math.ceil(file.length() / (1000 * 1000.0)));
     }
 }
