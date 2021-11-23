@@ -91,7 +91,12 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         List<Content> extra_files = new LinkedList<>();
         FileFilter filter = file -> {
             String restriction_method = restriction.split(":")[0];
-            String restriction_term = restriction.split(":")[1];
+            String restriction_term;
+            try {
+                restriction_term = restriction.split(":")[1];
+            } catch (IndexOutOfBoundsException e){
+                return true;
+            }
             if (restriction_method.equals("name")) {
                 return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
             }
@@ -334,6 +339,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             throw new Exception("Hash not found");
         }
         File file = new File(to_download.getLocal_route());
-        return ((int) Math.ceil(file.length() / (1000 * 1000.0)));
+        return ((int) Math.ceil(file.length() / (slice_size)));
     }
 }
