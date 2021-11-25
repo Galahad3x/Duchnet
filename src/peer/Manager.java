@@ -11,6 +11,6 @@ public interface Manager extends Remote {
      * @return a Content with its file_data
      * @throws Exception if something fails
      */
-    byte[] get_slice(String hash, Integer slice) throws Exception;
+    ByteSlice get_slice(String hash, Integer slice) throws Exception;
     Integer getSlicesNeeded(String hash) throws Exception;
 }

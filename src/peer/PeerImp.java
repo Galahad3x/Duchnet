@@ -276,8 +276,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         // For number of slices request the file with the slice
         try (FileOutputStream stream = new FileOutputStream(file_location)) {
             for (int i = 0; i < slices; i++) {
-                // TODO fer que no escrigui si el bytes esta incomplert
-                stream.write(seed_manager.get_slice(file_to_download.getHash(), i));
+                ByteSlice slice = seed_manager.get_slice(file_to_download.getHash(), i);
+                byte[] bytes = slice.getBytes();
+                for (int j = 0; j < slice.getBytes_written(); j++) {
+                    stream.write(bytes[j]);
+                }
             }
         }
         try {

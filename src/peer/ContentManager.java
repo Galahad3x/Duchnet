@@ -299,11 +299,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     // TODO Parallelize download slices
     @Override
-    public byte[] get_slice(String hash, Integer slice_index) throws Exception {
-        System.out.println("Downloading " + hash + " slice " + slice_index);
-        System.out.print(Runtime.getRuntime().maxMemory());
-        System.out.print(" ");
-        System.out.println(Runtime.getRuntime().freeMemory());
+    public ByteSlice get_slice(String hash, Integer slice_index) throws Exception {
         Content to_download = null;
         for (Content file : this.getContents()) {
             if (file.getHash().equals(hash)) {
@@ -324,13 +320,12 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     if (i == slice_index && the_byte >= 0) {
                         bytes[j] = (byte) the_byte;
                     } else if (the_byte < 0){
-                        System.out.println(the_byte);
-                        return bytes;
+                        return new ByteSlice(bytes, j);
                     }
                 }
             }
         }
-        return bytes;
+        return new ByteSlice(bytes, slice_size);
     }
 
     /**
