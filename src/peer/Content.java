@@ -21,7 +21,7 @@ public class Content implements Serializable {
      */
     private final List<String> file_description;
     /**
-     * The SHA256 hash of the file
+     * The CRC32 hash of the file
      */
     private final String hash;
     /**

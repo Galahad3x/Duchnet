@@ -30,39 +30,6 @@ public class FileSlicer {
         }
     }
 
-    public static void split_file(File the_file) throws IOException {
-        // 75 MB chunks
-        // the_file.length() es bytes
-        int slices = (int) Math.ceil((the_file.length() / (1024.0 * 1024.0)) / 50);
-        int number_of_digits = Integer.toString(slices).length();
-        BufferedInputStream in = new BufferedInputStream(new FileInputStream(the_file.getCanonicalPath()));
-        for (int i = 0; i < slices; i++) {
-            String filename = String.format("%0" + number_of_digits + "d", i) + the_file.getName();
-            System.out.println("STARTING " + filename);
-            try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(f + "/" + filename))) {
-                int bytes_read = 0;
-                byte[] bytes = new byte[1024 * 1024];
-                for (int j = 0; j < 50 || (bytes_read = in.read(bytes, 0, 1024 * 1024)) != -1; j++) {
-                    out.write(bytes);
-                }
-            }
-            System.out.println("FINISHED " + filename);
-        }
-    }
-
-    private static void join_file(List<File> slices, File into) throws IOException {
-        BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(into.getPath()));
-        for (File file : slices) {
-            System.out.println(file.getName());
-            BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-            byte[] bytes = new byte[1024 * 1024];
-            int bytes_read;
-            while ((bytes_read = in.read(bytes, 0, 1024 * 1024)) != -1) {
-                out.write(bytes);
-            }
-        }
-    }
-
     public static void splitFile(File f) throws IOException {
         int partCounter = 1;//I like to name parts from 001, 002, 003, ...
         //you can change it to 0 if you want 000, 001, ...

@@ -250,16 +250,19 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seed(file_to_download, new LinkedList<>());
         assert seeders.size() > 0;
+        // Do not transfer a file that is already owned by the user
         if (seeders.contains(this.own_info)) {
             System.out.println("You already own this file! Aborting...");
             return;
         }
+        // Request the file from a known seeder if possible
         Manager seed_manager = null;
         for (PeerInfo peer_info : seeders) {
             if (this.saved_peers_info.contains(peer_info)) {
                 seed_manager = saved_managers.get(peer_info.toString());
             }
         }
+        // Request a seeder from a new address if unknown
         if (seed_manager == null) {
             add_node_components(seeders.get(0));
             seed_manager = saved_managers.get(seeders.get(0).toString());
@@ -271,16 +274,15 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         Integer slices = seed_manager.getSlicesNeeded(file_to_download.getHash());
         System.out.println("Need " + slices + " slices");
         // For number of slices request the file with the slice
-        Content downloaded_file = null;
         try (FileOutputStream stream = new FileOutputStream(file_location)) {
             for (int i = 0; i < slices; i++) {
+                // TODO fer que no escrigui si el bytes esta incomplert
                 stream.write(seed_manager.get_slice(file_to_download.getHash(), i));
             }
         }
         try {
-            assert downloaded_file != null;
-            downloaded_file.setFile_data(null);
-            this.manager.add_content(downloaded_file);
+            System.out.println("Adding " + file_to_download.getHash());
+            this.manager.add_content(file_to_download);
             System.out.println("File downloaded!");
         } catch (NullPointerException e) {
             System.out.println("File failed to download!");

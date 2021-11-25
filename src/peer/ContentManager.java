@@ -1,8 +1,6 @@
 package peer;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
+import java.io.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -19,7 +17,10 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * List of all Contents, without file_data
      */
     private final List<Content> contents;
-    private final int slice_size = 1000;
+    /**
+     * The size of a slice that will be sent over the network, 1 MB (in bytes)
+     */
+    private final int slice_size = 1024 * 1024;
 
     /**
      * Constructor for ContentManager
@@ -94,7 +95,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             String restriction_term;
             try {
                 restriction_term = restriction.split(":")[1];
-            } catch (IndexOutOfBoundsException e){
+            } catch (IndexOutOfBoundsException e) {
                 return true;
             }
             if (restriction_method.equals("name")) {
@@ -316,17 +317,29 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         byte[] bytes;
         synchronized (this) {
             bytes = new byte[slice_size];
-            try (FileInputStream fis = new FileInputStream(file)) {
-                try {
-                    int read = fis.read(bytes, slice_index * slice_size, slice_size);
-                } catch (IndexOutOfBoundsException e) {
-                    bytes = fis.readNBytes((int) file.length() - slice_index * slice_size);
+            FileInputStream stream = new FileInputStream(file);
+            for (int i = 0; i <= slice_index; i++) {
+                for (int j = 0; j < slice_size; j++) {
+                    int the_byte = stream.read();
+                    if (i == slice_index && the_byte >= 0) {
+                        bytes[j] = (byte) the_byte;
+                    } else if (the_byte < 0){
+                        System.out.println(the_byte);
+                        return bytes;
+                    }
                 }
             }
         }
         return bytes;
     }
 
+    /**
+     * Return the number of slices of size 1 MB needed to get the whole file
+     *
+     * @param hash The hash of the file we want to slice
+     * @return The necessary number of slices
+     * @throws Exception If something fails
+     */
     @Override
     public Integer getSlicesNeeded(String hash) throws Exception {
         Content to_download = null;
@@ -339,6 +352,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             throw new Exception("Hash not found");
         }
         File file = new File(to_download.getLocal_route());
-        return ((int) Math.ceil(file.length() / (slice_size)));
+        return ((int) Math.ceil(file.length() / (float) slice_size));
     }
 }
