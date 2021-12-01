@@ -1,6 +1,7 @@
 package peer;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.rmi.NotBoundException;
@@ -299,44 +300,51 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         assert seed_manager != null;
         Integer slices = seed_manager.getSlicesNeeded(file_to_download.getHash());
         System.out.println("Need " + slices + " slices");
-        // Get the last slice to know bytes of non-full slice
-        ByteSlice slice = seed_manager.get_slice(file_to_download.getHash(), slices - 1);
-        // Write random bytes to fill the space
-        try (FileOutputStream stream = new FileOutputStream(file_location)) {
-            for (int i = 0; i < slices - 1; i++) {
-                for (int j = 0; j < this.manager.getSlice_size(); j++) {
-                    stream.write((byte) 0);
-                }
-            }
-        }
+        ByteSlice[] slice_array = new ByteSlice[slices];
         // For number of slices request the slice to the seeder
         // Right now, the main thread makes the calls and waits to make more
         // TODO Create a waiter thread that handles the waits so the main thread can go back to the main state
-        for (int i = 0; i < slices - 1; i++) {
+        for (int i = 0; i < slices; i++) {
             this.download_semaphore.acquire();
             System.out.println("STARTING THREAD " + i);
             int index = -1;
-            for (int j = 0; j < download_threads.length; j++) {
-                if (download_threads[j] == null || download_threads[j].isFinished()) {
-                    if (download_threads[j] != null && download_threads[j].result == null) {
-                        System.out.println("Something went wrong... ");
-                        this.download_semaphore.release();
-                        break;
+            while (index == -1) {
+                for (int j = 0; j < this.download_threads.length; j++) {
+                    if (this.download_threads[j] == null || this.download_threads[j].isFinished()) {
+                        index = j;
                     }
-                    if (download_threads[j] != null) {
-                        download_threads[j].join();
-                    }
-                    index = j;
-                    break;
                 }
             }
-            if (index == -1) {
-                System.out.println("Something went wrong... ");
-                this.download_semaphore.release();
-                break;
+            if (this.download_threads[index] != null) {
+                this.download_threads[index].join();
+                if (this.download_threads[index].result == null) {
+                    System.out.println("Something went wrong!");
+                }
+                this.download_threads[index] = null;
             }
-            download_threads[index] = new DownloadThread(seed_manager, file_to_download.getHash(), i, file_location, download_semaphore);
-            download_threads[index].start();
+            this.download_threads[index] = new DownloadThread(seed_manager, file_to_download.getHash(), i, download_semaphore, slice_array);
+            this.download_threads[index].start();
+        }
+
+        for (int i = 0; i < this.download_threads.length; i++) {
+            if (this.download_threads[i].getHash_to_download().equals(file_to_download.getHash())) {
+                this.download_threads[i].join();
+                if (this.download_threads[i].result == null) {
+                    System.out.println("Something went wrong!");
+                }
+                this.download_threads[i] = null;
+            }
+        }
+
+        System.out.println(Arrays.toString(slice_array));
+
+        try (FileOutputStream stream = new FileOutputStream(file_location)) {
+            for (ByteSlice slice : slice_array) {
+                byte[] the_bytes = slice.getBytes();
+                for (int j = 0; j < slice.getBytes_written(); j++) {
+                    stream.write(the_bytes[j]);
+                }
+            }
         }
         try {
             System.out.println("Adding " + file_to_download.getHash());
@@ -395,34 +403,29 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         return file_to_download;
     }
 
-    public class DownloadThread extends Thread {
+    public static class DownloadThread extends Thread {
         private final String hash_to_download;
         private final int slice_index;
         private final Manager seed_manager;
         public ByteSlice result = null;
         public boolean finished = false;
-        private final String file_location;
         private final Semaphore semaphore;
+        public ByteSlice[] slice_array;
 
-        public DownloadThread(Manager seed_manager, String hash_to_download, int slice_index, String file_location, Semaphore semaphore) {
+        public DownloadThread(Manager seed_manager, String hash_to_download, int slice_index, Semaphore semaphore, ByteSlice[] slice_array) {
             this.seed_manager = seed_manager;
             this.hash_to_download = hash_to_download;
             this.slice_index = slice_index;
-            this.file_location = file_location;
             this.semaphore = semaphore;
+            this.slice_array = slice_array;
         }
 
         @Override
         public void run() {
             try {
                 result = seed_manager.get_slice(hash_to_download, slice_index);
+                this.slice_array[slice_index] = result;
                 finished = true;
-                try (FileOutputStream stream = new FileOutputStream(file_location)) {
-                    byte[] bytes = result.getBytes();
-                    for (int j = 0; j < result.getBytes_written(); j++) {
-                        stream.write(new byte[]{bytes[j]}, (slice_index * this.slice_index) + j, 1);
-                    }
-                }
             } catch (Exception e) {
                 result = null;
                 finished = true;
@@ -433,6 +436,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         public boolean isFinished() {
             return finished;
+        }
+
+        public String getHash_to_download() {
+            return hash_to_download;
         }
     }
 }
