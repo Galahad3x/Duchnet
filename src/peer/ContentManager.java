@@ -6,8 +6,6 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.concurrent.Semaphore;
-import java.util.zip.CRC32;
-import java.util.zip.CheckedInputStream;
 
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
     /**
@@ -46,10 +44,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     public List<Content> getContents() {
         return contents;
-    }
-
-    public void add_content(Content downloaded_file) {
-        this.contents.add(downloaded_file);
     }
 
     /**
@@ -353,9 +347,5 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         File file = new File(to_download.getLocal_route());
         return ((int) Math.ceil(file.length() / (float) slice_size));
-    }
-
-    public int getSlice_size() {
-        return slice_size;
     }
 }
