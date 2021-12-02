@@ -298,9 +298,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         String file_location = this.manager.getFolder_route() + "/" + filename;
         System.out.println("Starting to download the file... ");
 
-        synchronized (queue_thread) {
+        synchronized (queue_thread.file_queue) {
             queue_thread.add_thread(seed_managers, file_to_download.getHash(), file_location);
-            queue_thread.notify();
         }
     }
 
@@ -402,8 +401,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         @Override
         public void run() {
-            synchronized (this) {
-                while (running) {
+            while (running) {
+                synchronized (this.active_files) {
                     for (int i = 0; i < this.active_files.length; i++) {
                         if (this.active_files[i] != null && this.active_files[i].finished) {
                             try {
@@ -414,29 +413,24 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                             this.active_files[i] = null;
                         }
                     }
-                    synchronized (file_queue) {
-                        for (int i = 0; i < this.active_files.length; i++) {
-                            if (this.active_files[i] == null) {
-                                if (!this.file_queue.isEmpty()) {
-                                    System.out.println("Starting a new file thread: ");
-                                    this.active_files[i] = file_queue.poll();
-                                    assert this.active_files[i] != null;
-                                    this.active_files[i].start();
-                                }
+                }
+                synchronized (this.file_queue) {
+                    for (int i = 0; i < this.active_files.length; i++) {
+                        if (this.active_files[i] == null) {
+                            if (!this.file_queue.isEmpty()) {
+                                System.out.println("Starting a new file thread: ");
+                                this.active_files[i] = file_queue.poll();
+                                assert this.active_files[i] != null;
+                                this.active_files[i].start();
                             }
                         }
-                    }
-                    try {
-                        this.wait();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
                     }
                 }
             }
         }
 
         public void add_thread(List<Manager> seed_managers, String hash, String file_location) throws Exception {
-            synchronized (file_queue) {
+            synchronized (this.file_queue) {
                 System.out.println("NEW FIlE IN queue");
                 file_queue.add(new FileQueueThread(this, seed_managers, hash, file_location));
             }
@@ -510,9 +504,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
             finished = true;
             System.out.println("File " + hash_to_download + " downloaded!");
-            synchronized (global_queue) {
-                global_queue.notify();
-            }
         }
 
         public void add_thread(DownloadThread thread) {
