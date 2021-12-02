@@ -5,8 +5,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.zip.CRC32;
-import java.util.zip.CheckedInputStream;
+import java.util.concurrent.Semaphore;
 
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
     /**
@@ -18,6 +17,10 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     private final List<Content> contents;
     /**
+     * Semaphore to control uploading concurrency
+     */
+    private final Semaphore upload_semaphore;
+    /**
      * The size of a slice that will be sent over the network, 1 MB (in bytes)
      */
     private final int slice_size = 1024 * 1024;
@@ -28,10 +31,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * @param folder_route the route of the folder
      * @throws RemoteException when remote calls fail
      */
-    public ContentManager(String folder_route) throws RemoteException {
+    public ContentManager(String folder_route, Semaphore upload_semaphore) throws RemoteException {
         super();
         this.folder_route = folder_route;
         this.contents = new ArrayList<>();
+        this.upload_semaphore = upload_semaphore;
     }
 
     public String getFolder_route() {
@@ -40,10 +44,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     public List<Content> getContents() {
         return contents;
-    }
-
-    public void add_content(Content downloaded_file) {
-        this.contents.add(downloaded_file);
     }
 
     /**
@@ -297,7 +297,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * @return a Content with its file_data
      * @throws Exception if something fails
      */
-    // TODO Parallelize download slices
     @Override
     public ByteSlice get_slice(String hash, Integer slice_index) throws Exception {
         Content to_download = null;
@@ -309,22 +308,22 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         if (to_download == null) {
             throw new Exception("Hash not found");
         }
+        this.upload_semaphore.acquire();
         File file = new File(to_download.getLocal_route());
         byte[] bytes;
-        synchronized (this) {
-            bytes = new byte[slice_size];
-            FileInputStream stream = new FileInputStream(file);
-            for (int i = 0; i <= slice_index; i++) {
-                for (int j = 0; j < slice_size; j++) {
-                    int the_byte = stream.read();
-                    if (i == slice_index && the_byte >= 0) {
-                        bytes[j] = (byte) the_byte;
-                    } else if (the_byte < 0){
-                        return new ByteSlice(bytes, j);
-                    }
+        bytes = new byte[slice_size];
+        FileInputStream stream = new FileInputStream(file);
+        for (int i = 0; i <= slice_index; i++) {
+            for (int j = 0; j < slice_size; j++) {
+                int the_byte = stream.read();
+                if (i == slice_index && the_byte >= 0) {
+                    bytes[j] = (byte) the_byte;
+                } else if (the_byte < 0) {
+                    return new ByteSlice(bytes, j);
                 }
             }
         }
+        this.upload_semaphore.release();
         return new ByteSlice(bytes, slice_size);
     }
 

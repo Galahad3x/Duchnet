@@ -8,6 +8,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 
 public class PeerImp extends UnicastRemoteObject implements Peer {
 
@@ -36,6 +37,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * The Registry of this peer
      */
     public Registry registry;
+
+    public GlobalQueueThread file_queue_thread;
+    public GlobalQueueThread download_queue_thread;
 
     /**
      * Constructor used for isolated nodes
@@ -100,9 +104,36 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         // configurar registry ip i registry port
         this.own_info = own_info;
         this.registry = reg;
+        int download_threads = 4;
+        int upload_threads = 4;
+        int file_threads = 4;
         Scanner scanner = new Scanner(System.in);
         System.out.println("Please type the route to the files: ");
-        this.manager = new ContentManager(scanner.nextLine());
+        String file_route = scanner.nextLine();
+        System.out.println("Type the maximum number of download threads: ");
+        try {
+            download_threads = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Couldn't parse the number, setting default 4");
+        }
+        System.out.println("Type the maximum number of upload threads: ");
+        try {
+            upload_threads = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Couldn't parse the number, setting default 4");
+        }
+        System.out.println("Type the maximum number of file threads: ");
+        try {
+            file_threads = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Couldn't parse the number, setting default 4");
+        }
+        Semaphore upload_semaphore = new Semaphore(upload_threads);
+        this.manager = new ContentManager(file_route, upload_semaphore);
+        this.file_queue_thread = new GlobalQueueThread(file_threads);
+        this.download_queue_thread = new GlobalQueueThread(download_threads);
+        this.file_queue_thread.start();
+        this.download_queue_thread.start();
         // /home/joel/Escriptori/DC/Duchnet/Files1
         this.registry.rebind("manager", this.manager);
         this.registry.rebind("peer", this);
@@ -130,6 +161,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             switch (command.toLowerCase()) {
                 case "quit":
                     System.out.println("Quitting...");
+                    // TODO Tancar els threads que queden oberts
                     System.exit(0);
                 case "list":
                     this.manager.list_files(false);
@@ -213,7 +245,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * @return List of all the PeerInfo's that own the file
      * @throws RemoteException if remote calls fail
      */
-    public List<PeerInfo> find_seed(Content file, List<PeerInfo> visited_peers) throws RemoteException {
+    public List<PeerInfo> find_seeders(Content file, List<PeerInfo> visited_peers) throws RemoteException {
         for (PeerInfo info : visited_peers) {
             if (info.toString().equals(this.own_info.toString())) {
                 return new LinkedList<>();
@@ -230,7 +262,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
         for (PeerInfo peer_info : saved_peers_info) {
             Peer peer = saved_peers.get(peer_info.toString());
-            List<PeerInfo> peer_result = peer.find_seed(file, new_visited_peers);
+            List<PeerInfo> peer_result = peer.find_seeders(file, new_visited_peers);
             for (PeerInfo peer_found_seeder : peer_result) {
                 if (!possible_seeders.contains(peer_found_seeder)) {
                     possible_seeders.add(peer_found_seeder);
@@ -248,7 +280,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * @throws Exception if something fails
      */
     public void fetch_file(Content file_to_download, String filename) throws Exception {
-        List<PeerInfo> seeders = find_seed(file_to_download, new LinkedList<>());
+        List<PeerInfo> seeders = find_seeders(file_to_download, new LinkedList<>());
         assert seeders.size() > 0;
         // Do not transfer a file that is already owned by the user
         if (seeders.contains(this.own_info)) {
@@ -256,40 +288,20 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             return;
         }
         // Request the file from a known seeder if possible
-        Manager seed_manager = null;
+        List<Manager> seed_managers = new LinkedList<>();
         for (PeerInfo peer_info : seeders) {
-            if (this.saved_peers_info.contains(peer_info)) {
-                seed_manager = saved_managers.get(peer_info.toString());
+            if (!this.saved_peers_info.contains(peer_info)) {
+                add_node(peer_info);
             }
-        }
-        // Request a seeder from a new address if unknown
-        if (seed_manager == null) {
-            add_node_components(seeders.get(0));
-            seed_manager = saved_managers.get(seeders.get(0).toString());
+            seed_managers.add(saved_managers.get(peer_info.toString()));
         }
         assert file_to_download != null;
         String file_location = this.manager.getFolder_route() + "/" + filename;
         System.out.println("Starting to download the file... ");
-        // Find number of slices needed
-        Integer slices = seed_manager.getSlicesNeeded(file_to_download.getHash());
-        System.out.println("Need " + slices + " slices");
-        // For number of slices request the file with the slice
-        try (FileOutputStream stream = new FileOutputStream(file_location)) {
-            for (int i = 0; i < slices; i++) {
-                ByteSlice slice = seed_manager.get_slice(file_to_download.getHash(), i);
-                byte[] bytes = slice.getBytes();
-                for (int j = 0; j < slice.getBytes_written(); j++) {
-                    stream.write(bytes[j]);
-                }
-            }
-        }
-        try {
-            System.out.println("Adding " + file_to_download.getHash());
-            this.manager.add_content(file_to_download);
-            System.out.println("File downloaded!");
-        } catch (NullPointerException e) {
-            System.out.println("File failed to download!");
-        }
+
+        // TODO Mirar si sha de partir el fitxer i fer-ho si fa falta
+
+        file_queue_thread.add_thread(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers, file_to_download.getHash(), file_location));
     }
 
     /**
@@ -339,4 +351,149 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         file_to_download.getFilenames().add(0, filename);
         return file_to_download;
     }
+
+    public static class GlobalQueueThread extends Thread {
+        final Queue<MyThread> queue;
+        final MyThread[] active;
+
+        public GlobalQueueThread(int allowed) {
+            queue = new LinkedList<>();
+            active = new MyThread[allowed];
+        }
+
+        @Override
+        public void run() {
+            try {
+                synchronized (this) {
+                    while (true) {
+                        this.wait();
+                        for (int i = 0; i < this.active.length; i++) {
+                            if (this.active[i] != null && this.active[i].isFinished()) {
+                                this.active[i].join();
+                                this.active[i].write_file();
+                                this.active[i] = null;
+                            }
+                            if (this.active[i] == null && !this.queue.isEmpty()) {
+                                this.active[i] = this.queue.poll();
+                                this.active[i].start();
+                            }
+                        }
+                    }
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void alert() {
+            synchronized (this) {
+                this.notify();
+            }
+        }
+
+        public void add_thread(MyThread thread) {
+            synchronized (this) {
+                System.out.println("NEW ELEMENT IN QUEUE");
+                queue.add(thread);
+                this.notify();
+            }
+        }
+    }
+
+    public static class FileQueueThread extends MyThread {
+        final GlobalQueueThread file_queue_thread;
+        final GlobalQueueThread download_queue_thread;
+        String hash_to_download;
+        final List<Manager> seed_managers;
+        final ByteSlice[] slices_array;
+        final String file_location;
+
+        public FileQueueThread(GlobalQueueThread file_thread, GlobalQueueThread download_thread, List<Manager> seed_managers, String hash_to_download, String file_location) throws Exception {
+            this.file_queue_thread = file_thread;
+            this.download_queue_thread = download_thread;
+            this.seed_managers = seed_managers;
+            this.hash_to_download = hash_to_download;
+            this.slices_array = new ByteSlice[this.seed_managers.get(0).getSlicesNeeded(hash_to_download)];
+            this.file_location = file_location;
+        }
+
+        @Override
+        public void run() {
+            for (int i = 0; i < this.slices_array.length; i++) {
+                Manager random_manager = seed_managers.get(new Random().nextInt(seed_managers.size()));
+                System.out.println("Adding download to queue ");
+                try {
+                    download_queue_thread.add_thread(new DownloadThread(download_queue_thread, this, random_manager, i));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        public void write_file() {
+            try (FileOutputStream stream = new FileOutputStream(file_location)) {
+                for (ByteSlice byteSlice : this.slices_array) {
+                    assert byteSlice != null;
+                    byte[] bytes = byteSlice.getBytes();
+                    for (int j = 0; j < byteSlice.getBytes_written(); j++) {
+                        stream.write(bytes[j]);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.out.println("File " + hash_to_download + " downloaded!");
+        }
+
+        public boolean isFinished() {
+            for (ByteSlice slice : slices_array) {
+                if (slice == null) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    public static class DownloadThread extends MyThread {
+        final GlobalQueueThread download_queue_thread;
+        final FileQueueThread file_thread;
+        final Manager seed_manager;
+        int slice_index;
+        boolean finished;
+
+        public DownloadThread(GlobalQueueThread download_thread, FileQueueThread file_thread, Manager seed_manager, int slice_index) {
+            this.download_queue_thread = download_thread;
+            this.seed_manager = seed_manager;
+            this.file_thread = file_thread;
+            this.slice_index = slice_index;
+        }
+
+        @Override
+        public void run() {
+            System.out.println("STARTING THREAD: " + file_thread.hash_to_download + " slice " + slice_index);
+            try {
+                ByteSlice result = seed_manager.get_slice(file_thread.hash_to_download, slice_index);
+                file_thread.slices_array[slice_index] = result;
+                finished = true;
+            } catch (Exception e) {
+                file_thread.slices_array[slice_index] = null;
+                finished = true;
+            }
+            this.download_queue_thread.alert();
+            this.file_thread.file_queue_thread.alert();
+            System.out.println("THREAD " + file_thread.hash_to_download + " " + this.slice_index + " is done!");
+        }
+
+        public boolean isFinished() {
+            return finished;
+        }
+
+        @Override
+        public void write_file() {
+
+        }
+    }
 }
+
+

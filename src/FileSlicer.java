@@ -55,21 +55,6 @@ public class FileSlicer {
         }
     }
 
-    public static void mergeFiles(List<File> files, File into)
-            throws IOException {
-        try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(into))) {
-            for (File f : files) {
-                BufferedInputStream in = new BufferedInputStream(new FileInputStream(f.getCanonicalPath()));
-                System.out.println("STARTING " + f.getName());
-                int bytes_read = 0;
-                byte[] bytes = new byte[1024 * 1024];
-                for (int j = 0; j < 50 || (bytes_read = in.read(bytes, 0, 1024 * 1024)) != -1; j++) {
-                    out.write(bytes);
-                }
-            }
-        }
-    }
-
     public static void mergeFilesOriginal(List<File> files, File into)
             throws IOException {
         try (FileOutputStream fos = new FileOutputStream(into);
