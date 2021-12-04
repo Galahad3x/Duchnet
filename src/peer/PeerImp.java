@@ -9,6 +9,10 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.concurrent.Semaphore;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 public class PeerImp extends UnicastRemoteObject implements Peer {
 
@@ -40,6 +44,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     public GlobalQueueThread file_queue_thread;
     public GlobalQueueThread download_queue_thread;
+
+    public static Logger logger = Logger.getLogger(PeerImp.class.getName());
 
     /**
      * Constructor used for isolated nodes
@@ -143,6 +149,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             original_peer.add_node(this.own_info);
         }
         // this.manager.list_files(false);
+        logger.addHandler(new ConsoleHandler());
+        logger.log(new LogRecord(Level.INFO, "Peer Started"));
         System.out.println("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
         this.service_loop();
     }
@@ -161,7 +169,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             switch (command.toLowerCase()) {
                 case "quit":
                     System.out.println("Quitting...");
-                    // TODO Tancar els threads que queden oberts
                     System.exit(0);
                 case "list":
                     this.manager.list_files(false);
