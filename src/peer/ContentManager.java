@@ -6,6 +6,7 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.concurrent.Semaphore;
+import java.util.logging.Logger;
 
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
     /**
@@ -25,17 +26,20 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     private final int slice_size = 1024 * 1024;
 
+    private final Logger logger;
+
     /**
      * Constructor for ContentManager
      *
      * @param folder_route the route of the folder
      * @throws RemoteException when remote calls fail
      */
-    public ContentManager(String folder_route, Semaphore upload_semaphore) throws RemoteException {
+    public ContentManager(String folder_route, Semaphore upload_semaphore, Logger logger) throws RemoteException {
         super();
         this.folder_route = folder_route;
         this.contents = new ArrayList<>();
         this.upload_semaphore = upload_semaphore;
+        this.logger = logger;
     }
 
     public String getFolder_route() {
@@ -65,12 +69,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                                 new ArrayList<>(),
                                 HashCalculator.getFileHash(file),
                                 new ArrayList<>());
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    } catch (IOException e) {
+                        logger.severe("IOException while calculating file");
+                    } finally {
+                        assert this_file != null;
+                        this_file.setLocal_route(file.getAbsolutePath());
+                        extra_files.add(this_file);
                     }
-                    assert this_file != null;
-                    this_file.setLocal_route(file.getAbsolutePath());
-                    extra_files.add(this_file);
                 } else {
                     extra_files.addAll(check_inside(file, null));
                 }
@@ -111,12 +116,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                             new ArrayList<>(),
                             HashCalculator.getFileHash(file),
                             new ArrayList<>());
-                } catch (Exception e) {
-                    e.printStackTrace();
+                } catch (IOException e) {
+                    logger.severe("IOException while calculating hash");
+                } finally {
+                    assert this_file != null;
+                    this_file.setLocal_route(file.getAbsolutePath());
+                    extra_files.add(this_file);
                 }
-                assert this_file != null;
-                this_file.setLocal_route(file.getAbsolutePath());
-                extra_files.add(this_file);
             } else {
                 extra_files.addAll(check_inside(file, filter));
             }
@@ -198,12 +204,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                             new ArrayList<>(),
                             HashCalculator.getFileHash(file),
                             new ArrayList<>());
-                } catch (Exception e) {
-                    e.printStackTrace();
+                } catch (IOException e) {
+                    logger.severe("IOException while calculating hash");
+                } finally {
+                    assert this_file != null;
+                    this_file.setLocal_route(file.getAbsolutePath());
+                    contents.add(this_file);
                 }
-                assert this_file != null;
-                this_file.setLocal_route(file.getAbsolutePath());
-                contents.add(this_file);
             } else {
                 contents.addAll(check_inside(file, null));
             }
@@ -308,6 +315,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         if (to_download == null) {
             throw new Exception("Hash not found");
         }
+        logger.info("Received new download thread");
         this.upload_semaphore.acquire();
         File file = new File(to_download.getLocal_route());
         byte[] bytes;
@@ -324,6 +332,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
         }
         this.upload_semaphore.release();
+        logger.info("Freed download thread");
         return new ByteSlice(bytes, slice_size);
     }
 
