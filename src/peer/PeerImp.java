@@ -174,15 +174,23 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     break;
                 case "help":
                     // Prints a help message
-                    // TODO Make a cool help
-                    System.out.println("quit,list,help,modify,list_all,download,debug");
+                    System.out.println("Duchnet HELP");
+                    System.out.println("------------------------------");
+                    System.out.println("COMMAND\t\t\tDESCRIPTION");
+                    System.out.println("QUIT\t\t\tQuits the program");
+                    System.out.println("HELP\t\t\tPrint this message");
+                    System.out.println("LIST\t\t\tList all files found in your local directory");
+                    System.out.println("LIST ALL\t\tList all files found in the network");
+                    System.out.println("MODIFY\t\t\tAdd descriptions and tags to your files");
+                    System.out.println("DOWNLOAD\t\tStart a download process");
+                    System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
                     break;
                 case "modify":
                     // List files found locally letting the user add data to them
                     this.manager.list_files(true);
                     this.manager.print_contents(this.manager.getContents());
                     break;
-                case "list_all":
+                case "list all":
                     // Lists all files found in the network
                     List<Content> network_contents = this.find_network_contents(new LinkedList<>(), "name:");
                     this.manager.print_contents(network_contents);
@@ -212,7 +220,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
-    // TODO Error handling this function
     public void download_file(String search_term, String search_method) throws Exception {
         if (search_method.equals("")) {
             search_method = "name";
