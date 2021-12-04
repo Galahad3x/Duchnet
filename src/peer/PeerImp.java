@@ -9,6 +9,7 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 import java.util.concurrent.Semaphore;
+import java.util.logging.*;
 
 public class PeerImp extends UnicastRemoteObject implements Peer {
 
@@ -40,6 +41,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
     public GlobalQueueThread file_queue_thread;
     public GlobalQueueThread download_queue_thread;
+
+    public static Logger logger = Logger.getLogger("peer");
 
     /**
      * Constructor used for isolated nodes
@@ -108,28 +111,28 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         int upload_threads = 4;
         int file_threads = 4;
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Please type the route to the files: ");
+        System.out.println("Type the route to the files: ");
         String file_route = scanner.nextLine();
         System.out.println("Type the maximum number of download threads: ");
         try {
             download_threads = Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
-            System.out.println("Couldn't parse the number, setting default 4");
+            logger.info("Couldn't parse the number, setting default 4");
         }
         System.out.println("Type the maximum number of upload threads: ");
         try {
             upload_threads = Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
-            System.out.println("Couldn't parse the number, setting default 4");
+            logger.info("Couldn't parse the number, setting default 4");
         }
         System.out.println("Type the maximum number of file threads: ");
         try {
             file_threads = Integer.parseInt(scanner.nextLine());
         } catch (NumberFormatException e) {
-            System.out.println("Couldn't parse the number, setting default 4");
+            logger.info("Couldn't parse the number, setting default 4");
         }
         Semaphore upload_semaphore = new Semaphore(upload_threads);
-        this.manager = new ContentManager(file_route, upload_semaphore);
+        this.manager = new ContentManager(file_route, upload_semaphore, logger);
         this.file_queue_thread = new GlobalQueueThread(file_threads);
         this.download_queue_thread = new GlobalQueueThread(download_threads);
         this.file_queue_thread.start();
@@ -143,11 +146,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             original_peer.add_node(this.own_info);
         }
         // this.manager.list_files(false);
-        System.out.println("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
+        logger.info("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
+        logger.setLevel(Level.WARNING);
         this.service_loop();
     }
-
-    // TODO Clean and standardize the CLI
 
     /**
      * Service loop of the peer, runs forever until closed by the user
@@ -160,40 +162,62 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             String command = scanner.nextLine();
             switch (command.toLowerCase()) {
                 case "quit":
+                    // Quits the application and shuts down the node
                     System.out.println("Quitting...");
-                    // TODO Tancar els threads que queden oberts
                     System.exit(0);
+                case "help":
+                    // Prints a help message
+                    System.out.println("Duchnet HELP");
+                    System.out.println("------------------------------");
+                    System.out.println("COMMAND\t\t\tDESCRIPTION");
+                    System.out.println("QUIT\t\t\tQuits the program");
+                    System.out.println("HELP\t\t\tPrint this message");
+                    System.out.println("LIST\t\t\tList all files found in your local directory");
+                    System.out.println("LIST ALL\t\tList all files found in the network");
+                    System.out.println("MODIFY\t\t\tAdd descriptions and tags to your files");
+                    System.out.println("DOWNLOAD\t\tStart a download process");
+                    System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
+                    break;
                 case "list":
+                    // List files found locally without modifying
                     this.manager.list_files(false);
                     this.manager.print_contents(this.manager.getContents());
                     break;
-                case "help":
-                    System.out.println("quit,list,help,modify,list_all,download");
-                    break;
-                case "modify":
-                    this.manager.list_files(true);
-                    this.manager.print_contents(this.manager.getContents());
-                    break;
-                case "list_all":
+                case "list all":
+                    // Lists all files found in the network
                     List<Content> network_contents = this.find_network_contents(new LinkedList<>(), "name:");
                     this.manager.print_contents(network_contents);
                     break;
+                case "modify":
+                    // List files found locally letting the user add data to them
+                    this.manager.list_files(true);
+                    this.manager.print_contents(this.manager.getContents());
+                    break;
                 case "download":
-                    System.out.println("What do you want to search by? Leave blank for name ");
+                    // Lets the user search for a file and start its download
+                    System.out.println("What do you want to search by? ");
                     String search_method = scanner.nextLine();
                     System.out.println("What do you want to search for? ");
                     String search_term = scanner.nextLine();
                     try {
                         download_file(search_term, search_method);
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        logger.severe("Something went wrong while starting a download");
+                    }
+                    break;
+                case "debug":
+                    if (logger.getLevel().equals(Level.INFO)) {
+                        logger.info("Setting debug level to WARNING");
+                        logger.setLevel(Level.WARNING);
+                    } else {
+                        logger.setLevel(Level.INFO);
+                        logger.info("Setting debug level to INFO");
                     }
                     break;
             }
         }
     }
 
-    // TODO Error handling this function
     public void download_file(String search_term, String search_method) throws Exception {
         if (search_method.equals("")) {
             search_method = "name";
@@ -201,7 +225,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         List<Content> network_contents = find_network_contents(new LinkedList<>(), search_method + ":" + search_term);
         Content file_to_download = let_user_choose_file(network_contents);
         if (file_to_download == null) {
-            System.out.println("Error finding the file, cancelling...");
+            logger.warning("The file you specified has not been found, no download has been started");
             return;
         }
         fetch_file(file_to_download, file_to_download.getFilenames().get(0));
@@ -281,10 +305,13 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      */
     public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seeders(file_to_download, new LinkedList<>());
-        assert seeders.size() > 0;
+        if (seeders.size() == 0) {
+            logger.severe("The file has no seeders");
+            return;
+        }
         // Do not transfer a file that is already owned by the user
         if (seeders.contains(this.own_info)) {
-            System.out.println("You already own this file! Aborting...");
+            logger.info("You already own this file, aborting download...");
             return;
         }
         // Request the file from a known seeder if possible
@@ -295,11 +322,12 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
             seed_managers.add(saved_managers.get(peer_info.toString()));
         }
-        assert file_to_download != null;
+        if (file_to_download == null) {
+            logger.severe("Something went wrong with the file selection");
+            return;
+        }
         String file_location = this.manager.getFolder_route() + "/" + filename;
-        System.out.println("Starting to download the file... ");
-
-        // TODO Mirar si sha de partir el fitxer i fer-ho si fa falta
+        logger.info("Adding " + filename + " to the download queue");
 
         file_queue_thread.add_thread(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers, file_to_download.getHash(), file_location));
     }
@@ -355,6 +383,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     public static class GlobalQueueThread extends Thread {
         final Queue<MyThread> queue;
         final MyThread[] active;
+        boolean running = true;
 
         public GlobalQueueThread(int allowed) {
             queue = new LinkedList<>();
@@ -365,7 +394,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         public void run() {
             try {
                 synchronized (this) {
-                    while (true) {
+                    while (running) {
                         this.wait();
                         for (int i = 0; i < this.active.length; i++) {
                             if (this.active[i] != null && this.active[i].isFinished()) {
@@ -375,13 +404,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                             }
                             if (this.active[i] == null && !this.queue.isEmpty()) {
                                 this.active[i] = this.queue.poll();
+                                logger.info("New thread from " + this.getName());
                                 this.active[i].start();
                             }
                         }
                     }
                 }
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                logger.severe("InterruptedException at " + this.getName());
             }
         }
 
@@ -393,7 +423,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         public void add_thread(MyThread thread) {
             synchronized (this) {
-                System.out.println("NEW ELEMENT IN QUEUE");
+                logger.info("Added thread successfully to queue in " + this.getName());
                 queue.add(thread);
                 this.notify();
             }
@@ -421,28 +451,29 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         public void run() {
             for (int i = 0; i < this.slices_array.length; i++) {
                 Manager random_manager = seed_managers.get(new Random().nextInt(seed_managers.size()));
-                System.out.println("Adding download to queue ");
-                try {
-                    download_queue_thread.add_thread(new DownloadThread(download_queue_thread, this, random_manager, i));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                logger.info("Attempting to add " + this.hash_to_download + " " + i + "to download queue ");
+                download_queue_thread.add_thread(new DownloadThread(download_queue_thread, this, random_manager, i));
             }
         }
 
         public void write_file() {
             try (FileOutputStream stream = new FileOutputStream(file_location)) {
                 for (ByteSlice byteSlice : this.slices_array) {
-                    assert byteSlice != null;
+                    if (byteSlice == null) {
+                        throw new RemoteException();
+                    }
                     byte[] bytes = byteSlice.getBytes();
                     for (int j = 0; j < byteSlice.getBytes_written(); j++) {
                         stream.write(bytes[j]);
                     }
                 }
+            } catch (RemoteException e) {
+                logger.severe("A download thread for " + hash_to_download + "failed");
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.severe("IOException while writing " + this.hash_to_download);
+            } finally {
+                logger.severe("File " + hash_to_download + " downloaded!");
             }
-            System.out.println("File " + hash_to_download + " downloaded!");
         }
 
         public boolean isFinished() {
@@ -471,7 +502,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         @Override
         public void run() {
-            System.out.println("STARTING THREAD: " + file_thread.hash_to_download + " slice " + slice_index);
+            logger.info("Starting download thread " + this.file_thread.hash_to_download + " " + slice_index);
             try {
                 ByteSlice result = seed_manager.get_slice(file_thread.hash_to_download, slice_index);
                 file_thread.slices_array[slice_index] = result;
@@ -482,7 +513,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
             this.download_queue_thread.alert();
             this.file_thread.file_queue_thread.alert();
-            System.out.println("THREAD " + file_thread.hash_to_download + " " + this.slice_index + " is done!");
+            logger.info("Thread " + this.file_thread.hash_to_download + " " + slice_index + " is done!");
         }
 
         public boolean isFinished() {
@@ -491,7 +522,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         @Override
         public void write_file() {
-
         }
     }
 }
