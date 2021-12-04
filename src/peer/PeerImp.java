@@ -151,8 +151,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         this.service_loop();
     }
 
-    // TODO Clean and standardize the CLI
-
     /**
      * Service loop of the peer, runs forever until closed by the user
      * Listens for commands
@@ -167,11 +165,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     // Quits the application and shuts down the node
                     System.out.println("Quitting...");
                     System.exit(0);
-                case "list":
-                    // List files found locally without modifying
-                    this.manager.list_files(false);
-                    this.manager.print_contents(this.manager.getContents());
-                    break;
                 case "help":
                     // Prints a help message
                     System.out.println("Duchnet HELP");
@@ -185,15 +178,20 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("DOWNLOAD\t\tStart a download process");
                     System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
                     break;
-                case "modify":
-                    // List files found locally letting the user add data to them
-                    this.manager.list_files(true);
+                case "list":
+                    // List files found locally without modifying
+                    this.manager.list_files(false);
                     this.manager.print_contents(this.manager.getContents());
                     break;
                 case "list all":
                     // Lists all files found in the network
                     List<Content> network_contents = this.find_network_contents(new LinkedList<>(), "name:");
                     this.manager.print_contents(network_contents);
+                    break;
+                case "modify":
+                    // List files found locally letting the user add data to them
+                    this.manager.list_files(true);
+                    this.manager.print_contents(this.manager.getContents());
                     break;
                 case "download":
                     // Lets the user search for a file and start its download
@@ -208,10 +206,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     }
                     break;
                 case "debug":
-                    if (logger.getLevel().equals(Level.INFO)){
+                    if (logger.getLevel().equals(Level.INFO)) {
                         logger.info("Setting debug level to WARNING");
                         logger.setLevel(Level.WARNING);
-                    }else{
+                    } else {
                         logger.setLevel(Level.INFO);
                         logger.info("Setting debug level to INFO");
                     }
@@ -523,7 +521,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
 
         @Override
-        public void write_file() {}
+        public void write_file() {
+        }
     }
 }
 
