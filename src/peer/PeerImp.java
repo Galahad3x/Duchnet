@@ -33,7 +33,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     /**
      * The Manager of this peer
      */
-    private ContentManager manager;
+    protected ContentManager manager;
     /**
      * The Registry of this peer
      */
@@ -72,7 +72,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         try {
             this.add_node_components(info);
             this.saved_peers_info.add(info);
-        } catch (NotBoundException e) {
+        } catch (RemoteException | NotBoundException e) {
             System.out.println("Something was not found: Node has been created isolated");
         }
     }
@@ -164,6 +164,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "quit":
                     // Quits the application and shuts down the node
                     System.out.println("Quitting...");
+                    XMLDatabase.write_to_xml(this.manager.getFolder_route(), this.manager.getContents());
                     System.exit(0);
                 case "help":
                     // Prints a help message
@@ -328,6 +329,16 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
         String file_location = this.manager.getFolder_route() + "/" + filename;
         logger.info("Adding " + filename + " to the download queue");
+
+        Manager manager = seed_managers.get(new Random(seed_managers.size()).nextInt());
+        try {
+            Content info = manager.get_information(file_to_download.getHash());
+            ContentManager.merge_lists(this.manager.getContents(), Collections.singletonList(info));
+        } catch (Exception e){
+            logger.warning("Something failed while retrieving data");
+        }
+
+        // TODO tema d'utilitzar el fileslicer per separar (als managers)
 
         file_queue_thread.add_thread(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers, file_to_download.getHash(), file_location));
     }
