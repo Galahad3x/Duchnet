@@ -48,7 +48,7 @@ public class FileSlicer {
             int bytesAmount = 0;
             while ((bytesAmount = bis.read(buffer)) > 0) {
                 //write each chunk of data into separate file with different number in name
-                String filePartName = String.format("%0" + number_of_digits + "d%s", partCounter++, fileName);
+                String filePartName = String.format(".%0" + number_of_digits + "d%s", partCounter++, fileName);
                 File newFile = new File(f.getParent(), filePartName);
                 try (FileOutputStream out = new FileOutputStream(newFile)) {
                     out.write(buffer, 0, bytesAmount);
