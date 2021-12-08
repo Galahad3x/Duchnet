@@ -127,9 +127,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 extra_files.addAll(check_inside(file, filter));
             }
         }
-        XMLDatabase.read_from_file(this.folder_route, extra_files);
-        XMLDatabase.write_to_xml(this.folder_route, extra_files);
         merge_lists(contents, extra_files);
+        XMLDatabase.read_from_file(this.folder_route, contents);
+        XMLDatabase.write_to_xml(this.folder_route, contents);
     }
 
     /**
@@ -245,8 +245,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             extra_contents.add(this_file);
         }
         XMLDatabase.read_from_file(this.folder_route, extra_contents);
-        XMLDatabase.write_to_xml(this.folder_route, extra_contents);
         merge_lists(contents, extra_contents);
+        XMLDatabase.write_to_xml(this.folder_route, contents);
     }
 
     /**
@@ -354,6 +354,18 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return to_download;
     }
 
+    @Override
+    public String get_filename(String hash, List<String> names) throws Exception {
+        for (String name : names) {
+            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name) && !fi.getName().startsWith(name)))) {
+                if (hash.equals(HashCalculator.getFileHash(f))) {
+                    return f.getName();
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Return the number of slices of size 1 MB needed to get the whole file
      *
@@ -374,5 +386,35 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         File file = new File(to_download.getLocal_route());
         return ((int) Math.ceil(file.length() / (float) slice_size));
+    }
+
+    @Override
+    public List<String> getHashesNeeded(String hash) throws Exception {
+        Content to_download = null;
+        for (Content file : this.getContents()) {
+            if (file.getHash().equals(hash)) {
+                to_download = file;
+            }
+        }
+        if (to_download == null) {
+            throw new Exception("Hash not found");
+        }
+        File file = new File(to_download.getLocal_route());
+        String name = file.getName();
+        if ((file.length() / slice_size) > 25) {
+            FileSlicer.splitFile(file);
+        } else {
+            return new LinkedList<>(Collections.singleton(hash));
+        }
+        List<String> hashes = new LinkedList<>();
+        this.list_filtered_files("name:" + name);
+        for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().contains(name) && !fi.getName().startsWith(name)))) {
+            for (Content elem : this.getContents()) {
+                if (elem.getFilenames().contains(f.getName())) {
+                    hashes.add(elem.getHash());
+                }
+            }
+        }
+        return hashes;
     }
 }

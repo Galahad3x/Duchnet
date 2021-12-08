@@ -178,6 +178,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("MODIFY\t\t\tAdd descriptions and tags to your files");
                     System.out.println("DOWNLOAD\t\tStart a download process");
                     System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
+                    System.out.println("PROGRESS\t\tShow information about downloads in motion");
                     break;
                 case "list":
                     // List files found locally without modifying
@@ -203,6 +204,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     try {
                         download_file(search_term, search_method);
                     } catch (Exception e) {
+                        e.printStackTrace();
                         logger.severe("Something went wrong while starting a download");
                     }
                     break;
@@ -214,6 +216,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         logger.setLevel(Level.INFO);
                         logger.info("Setting debug level to INFO");
                     }
+                    break;
+                case "progress":
+                    this.file_queue_thread.printProgress();
                     break;
             }
         }
@@ -327,20 +332,27 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             logger.severe("Something went wrong with the file selection");
             return;
         }
-        String file_location = this.manager.getFolder_route() + "/" + filename;
+        String file_location;
         logger.info("Adding " + filename + " to the download queue");
 
-        Manager manager = seed_managers.get(new Random(seed_managers.size()).nextInt());
+        int rand = new Random(seed_managers.size()).nextInt() % seed_managers.size();
+        Manager manager = seed_managers.get(rand);
         try {
             Content info = manager.get_information(file_to_download.getHash());
             ContentManager.merge_lists(this.manager.getContents(), Collections.singletonList(info));
-        } catch (Exception e){
+        } catch (Exception e) {
             logger.warning("Something failed while retrieving data");
         }
 
-        // TODO tema d'utilitzar el fileslicer per separar (als managers)
+        logger.warning("Going for it");
+        List<String> hashes = manager.getHashesNeeded(file_to_download.getHash());
 
-        file_queue_thread.add_thread(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers, file_to_download.getHash(), file_location));
+        List<MyThread> threads = new LinkedList<>();
+        for (String hash : hashes) {
+            file_location = this.manager.getFolder_route() + "/" + manager.get_filename(hash, file_to_download.getFilenames());
+            threads.add(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers, hash, file_location));
+        }
+        file_queue_thread.add_threads(threads);
     }
 
     /**
@@ -395,10 +407,12 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         final Queue<MyThread> queue;
         final MyThread[] active;
         boolean running = true;
+        final Object lck;
 
         public GlobalQueueThread(int allowed) {
             queue = new LinkedList<>();
             active = new MyThread[allowed];
+            lck = new Object();
         }
 
         @Override
@@ -406,38 +420,90 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             try {
                 synchronized (this) {
                     while (running) {
+                        logger.warning("Global Queue waits " + this.getName());
                         this.wait();
-                        for (int i = 0; i < this.active.length; i++) {
-                            if (this.active[i] != null && this.active[i].isFinished()) {
-                                this.active[i].join();
-                                this.active[i].write_file();
-                                this.active[i] = null;
-                            }
-                            if (this.active[i] == null && !this.queue.isEmpty()) {
-                                this.active[i] = this.queue.poll();
-                                logger.info("New thread from " + this.getName());
-                                this.active[i].start();
+                        logger.warning("Global Queue owns the critical zone" + this.getName());
+                        synchronized (lck) {
+                            for (int i = 0; i < this.active.length; i++) {
+                                System.err.println("Recorrent " + this.getName());
+                                if (this.active[i] != null && this.active[i].isFinished()) {
+                                    System.err.println("Primer if " + this.getName() + " " + this.active[i].get_progress());
+                                    this.active[i].write_file();
+                                    System.err.println("Primer iif " + this.getName());
+                                    if (!this.active[i].getState().equals(State.BLOCKED)) {
+                                        this.active[i].join();
+                                    }else{
+                                        continue;
+                                    }
+                                    System.err.println("Primer iiif " + this.getName());
+                                    this.active[i] = null;
+                                }
+                                if (this.active[i] == null && !this.queue.isEmpty()) {
+                                    System.err.println("Segon if " + this.getName());
+                                    this.active[i] = this.queue.poll();
+                                    logger.warning("New thread from " + this.getName());
+                                    this.active[i].create_slice_array();
+                                    this.active[i].start();
+                                }
                             }
                         }
                     }
                 }
             } catch (InterruptedException e) {
                 logger.severe("InterruptedException at " + this.getName());
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
-        public void alert() {
+        public void alert(DownloadThread alerting) {
+            logger.info("Main thread awaits critical zone");
             synchronized (this) {
+                if (alerting != null){
+                    alerting.finished = true;
+                }
+                logger.info("Main thread notifies global thread");
                 this.notify();
             }
+            logger.info("Main thread is out of critical zone");
         }
 
         public void add_thread(MyThread thread) {
+            logger.info("Main thread awaits critical zone");
             synchronized (this) {
                 logger.info("Added thread successfully to queue in " + this.getName());
                 queue.add(thread);
+                logger.info("Main thread notifies global thread");
                 this.notify();
             }
+            logger.info("Main thread is out of critical zone");
+        }
+
+        public void add_threads(List<MyThread> threads) {
+            logger.info("Other thread awaits critical zone on " + this.getName());
+            synchronized (this) {
+                logger.warning("Other thread owns critical zone on " + this.getName());
+                for (MyThread thr : threads) {
+                    logger.info("Added thread successfully to queue in " + this.getName());
+                    queue.add(thr);
+                }
+                logger.warning("Other thread notifies global thread " + this.getName());
+                this.notify();
+            }
+            logger.info("Main thread is out of critical zone");
+        }
+
+        public void printProgress() {
+            List<String> progress = new LinkedList<>();
+            for (MyThread thread : this.active) {
+                if (thread == null) {
+                    progress.add("null");
+                } else {
+                    progress.add(thread.get_progress());
+                }
+            }
+            System.out.println("ACTIVE: " + progress);
+            System.out.println("QUEUE: " + queue.size());
         }
     }
 
@@ -446,28 +512,42 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         final GlobalQueueThread download_queue_thread;
         String hash_to_download;
         final List<Manager> seed_managers;
-        final ByteSlice[] slices_array;
+        ByteSlice[] slices_array;
         final String file_location;
 
-        public FileQueueThread(GlobalQueueThread file_thread, GlobalQueueThread download_thread, List<Manager> seed_managers, String hash_to_download, String file_location) throws Exception {
+        public FileQueueThread(GlobalQueueThread file_thread, GlobalQueueThread download_thread, List<Manager> seed_managers, String hash_to_download, String file_location) {
             this.file_queue_thread = file_thread;
             this.download_queue_thread = download_thread;
             this.seed_managers = seed_managers;
             this.hash_to_download = hash_to_download;
-            this.slices_array = new ByteSlice[this.seed_managers.get(0).getSlicesNeeded(hash_to_download)];
+            this.slices_array = null;
             this.file_location = file_location;
         }
 
         @Override
         public void run() {
-            for (int i = 0; i < this.slices_array.length; i++) {
-                Manager random_manager = seed_managers.get(new Random().nextInt(seed_managers.size()));
-                logger.info("Attempting to add " + this.hash_to_download + " " + i + "to download queue ");
-                download_queue_thread.add_thread(new DownloadThread(download_queue_thread, this, random_manager, i));
+            try {
+                logger.warning("Attempting to add all threads");
+                List<MyThread> threads = new LinkedList<>();
+                for (int i = 0; i < this.slices_array.length; i++) {
+                    Manager random_manager = seed_managers.get(new Random().nextInt(seed_managers.size()));
+                    logger.info("Attempting to add " + this.hash_to_download + " " + i + "to download queue ");
+                    threads.add(new DownloadThread(download_queue_thread, this, random_manager, i));
+                }
+                download_queue_thread.add_threads(threads);
+                logger.warning("Threads added");
+            } catch (Exception e) {
+                logger.severe("ERROR WHILE DOWNLOADING " + hash_to_download);
             }
         }
 
+        public void create_slice_array() throws Exception {
+            this.slices_array = new ByteSlice[this.seed_managers.get(0).getSlicesNeeded(hash_to_download)];
+            logger.warning("Created slice array");
+        }
+
         public void write_file() {
+            logger.warning("Starting to write " + this.hash_to_download);
             try (FileOutputStream stream = new FileOutputStream(file_location)) {
                 for (ByteSlice byteSlice : this.slices_array) {
                     if (byteSlice == null) {
@@ -482,18 +562,28 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 logger.severe("A download thread for " + hash_to_download + "failed");
             } catch (IOException e) {
                 logger.severe("IOException while writing " + this.hash_to_download);
-            } finally {
-                logger.severe("File " + hash_to_download + " downloaded!");
             }
+            logger.severe("File " + hash_to_download + " downloaded!");
         }
 
         public boolean isFinished() {
+            // NullPointerException aqui?????
             for (ByteSlice slice : slices_array) {
                 if (slice == null) {
                     return false;
                 }
             }
             return true;
+        }
+
+        public String get_progress() {
+            int completed = 0;
+            for (ByteSlice slice : slices_array) {
+                if (slice != null) {
+                    completed += 1;
+                }
+            }
+            return hash_to_download + ":" + completed + "/" + slices_array.length;
         }
     }
 
@@ -509,6 +599,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             this.seed_manager = seed_manager;
             this.file_thread = file_thread;
             this.slice_index = slice_index;
+            this.finished = false;
         }
 
         @Override
@@ -517,14 +608,17 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             try {
                 ByteSlice result = seed_manager.get_slice(file_thread.hash_to_download, slice_index);
                 file_thread.slices_array[slice_index] = result;
-                finished = true;
             } catch (Exception e) {
                 file_thread.slices_array[slice_index] = null;
-                finished = true;
             }
-            this.download_queue_thread.alert();
-            this.file_thread.file_queue_thread.alert();
+            System.out.println("+++++++++++++++++++++");
+            this.download_queue_thread.printProgress();
+            System.out.println("---------------------");
+            this.file_thread.file_queue_thread.printProgress();
             logger.info("Thread " + this.file_thread.hash_to_download + " " + slice_index + " is done!");
+            this.file_thread.file_queue_thread.alert(this);
+            this.download_queue_thread.alert(this);
+            finished = true;
         }
 
         public boolean isFinished() {
@@ -533,6 +627,15 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         @Override
         public void write_file() {
+        }
+
+        @Override
+        public void create_slice_array() {
+        }
+
+        @Override
+        public String get_progress() {
+            return file_thread.hash_to_download;
         }
     }
 }
