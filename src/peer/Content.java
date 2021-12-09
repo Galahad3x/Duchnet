@@ -31,10 +31,11 @@ public class Content implements Serializable {
 
     /**
      * Constructor used to create a Content
-     * @param file_names the filenames the file has
+     *
+     * @param file_names       the filenames the file has
      * @param file_description the possible the file has
-     * @param hash the hash of the file
-     * @param tags the tags the file has
+     * @param hash             the hash of the file
+     * @param tags             the tags the file has
      */
     public Content(List<String> file_names, List<String> file_description, String hash, List<String> tags) {
         this.file_name = file_names;
@@ -46,6 +47,7 @@ public class Content implements Serializable {
     public List<String> getFilenames() {
         return file_name;
     }
+
     public void add_alternative_name(String name) {
         file_name.add(name);
     }
@@ -53,15 +55,21 @@ public class Content implements Serializable {
     public List<String> getFileDescriptions() {
         return file_description;
     }
+
     public void add_alternative_description(String description) {
-        file_description.add(description);
+        if (!file_description.contains(description)) {
+            file_description.add(description);
+        }
     }
 
     public List<String> getTags() {
         return tags;
     }
+
     public void add_tag(String tag) {
-        tags.add(tag);
+        if (!tags.contains(tag)) {
+            tags.add(tag);
+        }
     }
 
     public String getHash() {
@@ -71,6 +79,7 @@ public class Content implements Serializable {
     public String getLocal_route() {
         return local_route;
     }
+
     public void setLocal_route(String local_route) {
         this.local_route = local_route;
     }
@@ -78,6 +87,7 @@ public class Content implements Serializable {
     public void setFile_data(byte[] file_data) {
         this.file_data = file_data;
     }
+
     public byte[] getFile_data() {
         return file_data;
     }

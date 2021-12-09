@@ -11,7 +11,7 @@ public class HashCalculator {
      * Get the hash of a file
      *
      * @param file the file
-     * @return SHA256 hash of a file
+     * @return CRC32 hash of a file
      */
     public static String getFileHash(File file) throws IOException {
         // If file is more than 100 MB

@@ -47,12 +47,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     public List<Content> getContents() {
-        return contents;
+        return XMLDatabase.read_from_file(this.folder_route, contents);
     }
 
     /**
      * List all the files in folder_route, or let the user add data
-     * TODO Save the info on a file for later use (Quality Features: On a database)
      *
      * @param add_data let the user add data or not
      */
@@ -80,7 +79,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     extra_files.addAll(check_inside(file, null));
                 }
             }
-            // TODO Read hash related info in a file or db
+            XMLDatabase.read_from_file(this.folder_route, extra_files);
+            XMLDatabase.write_to_xml(this.folder_route, extra_files);
             merge_lists(contents, extra_files);
         } else {
             update_files();
@@ -127,8 +127,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 extra_files.addAll(check_inside(file, filter));
             }
         }
-        // TODO Read hash related info in a file or db
         merge_lists(contents, extra_files);
+        XMLDatabase.read_from_file(this.folder_route, contents);
+        XMLDatabase.write_to_xml(this.folder_route, contents);
     }
 
     /**
@@ -224,7 +225,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     private void update_files() {
         File f = new File(this.folder_route);
         List<Content> extra_contents = new LinkedList<>();
-        for (File file : Objects.requireNonNull(f.listFiles())) {
+        // TODO add directory support to this function
+        for (File file : Objects.requireNonNull(f.listFiles(File::isFile))) {
             System.out.println("File name: " + file.getName());
             Scanner scanner = new Scanner(System.in);
             System.out.println("Type descriptions separated by , or leave blank: ");
@@ -234,15 +236,17 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             Content this_file = null;
             try {
                 this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        Arrays.asList(descriptions),
+                        new LinkedList<>(Arrays.asList(descriptions)),
                         HashCalculator.getFileHash(file),
-                        Arrays.asList(tags));
+                        new LinkedList<>(Arrays.asList(tags)));
             } catch (Exception e) {
                 e.printStackTrace();
             }
             extra_contents.add(this_file);
         }
+        XMLDatabase.read_from_file(this.folder_route, extra_contents);
         merge_lists(contents, extra_contents);
+        XMLDatabase.write_to_xml(this.folder_route, contents);
     }
 
     /**
@@ -336,6 +340,32 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return new ByteSlice(bytes, slice_size);
     }
 
+    @Override
+    public Content get_information(String hash) throws Exception {
+        Content to_download = null;
+        for (Content file : this.getContents()) {
+            if (file.getHash().equals(hash)) {
+                to_download = file;
+            }
+        }
+        if (to_download == null) {
+            throw new Exception("Hash not found");
+        }
+        return to_download;
+    }
+
+    @Override
+    public String get_filename(String hash, List<String> names) throws Exception {
+        for (String name : names) {
+            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name) && !fi.getName().startsWith(name)))) {
+                if (hash.equals(HashCalculator.getFileHash(f))) {
+                    return f.getName();
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Return the number of slices of size 1 MB needed to get the whole file
      *
@@ -356,5 +386,35 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         File file = new File(to_download.getLocal_route());
         return ((int) Math.ceil(file.length() / (float) slice_size));
+    }
+
+    @Override
+    public List<String> getHashesNeeded(String hash) throws Exception {
+        Content to_download = null;
+        for (Content file : this.getContents()) {
+            if (file.getHash().equals(hash)) {
+                to_download = file;
+            }
+        }
+        if (to_download == null) {
+            throw new Exception("Hash not found");
+        }
+        File file = new File(to_download.getLocal_route());
+        String name = file.getName();
+        if ((file.length() / slice_size) > 25) {
+            FileSlicer.splitFile(file);
+        } else {
+            return new LinkedList<>(Collections.singleton(hash));
+        }
+        List<String> hashes = new LinkedList<>();
+        this.list_filtered_files("name:" + name);
+        for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().contains(name) && !fi.getName().startsWith(name)))) {
+            for (Content elem : this.getContents()) {
+                if (elem.getFilenames().contains(f.getName())) {
+                    hashes.add(elem.getHash());
+                }
+            }
+        }
+        return hashes;
     }
 }

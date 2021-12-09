@@ -4,7 +4,7 @@ Peer2Peer network implemented using Java RMI
 
 ### TODOs
 
-- Adaptar FileSlicer per a ferse servir al descarregar
+- Adaptar peer.FileSlicer per a ferse servir al descarregar
     - Partir al(s) seeder(s) i reconstruir al user
 - Transferencies amb slices de 1 MB ben fet (Arreglar fetch_file)
 - Ordenar el codi
