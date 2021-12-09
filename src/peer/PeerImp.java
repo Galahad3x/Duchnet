@@ -435,7 +435,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                                     this.active[i].write_file();
                                     // Per evitar el deadlock de alert()
                                     if (!this.active[i].getState().equals(State.BLOCKED)) {
-                                        this.active[i].join();
+                                        this.active[i].join(2000);
                                     } else {
                                         continue;
                                     }
