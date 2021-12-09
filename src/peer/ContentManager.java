@@ -26,6 +26,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     private final int slice_size = 1024 * 1024;
 
+    /**
+     * Logger used to print INFO, WARNINGs and SEVEREs
+     */
     private final Logger logger;
 
     /**
@@ -340,6 +343,12 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return new ByteSlice(bytes, slice_size);
     }
 
+    /**
+     * Request a content's information from a seed
+     * @param hash The hash of the file we want
+     * @return The content, with the descriptions and the tags
+     * @throws Exception If the remote connection fails
+     */
     @Override
     public Content get_information(String hash) throws Exception {
         Content to_download = null;
@@ -354,6 +363,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return to_download;
     }
 
+    /**
+     * Return the name of a file as it is in the folder
+     * @param hash The hash of the file
+     * @param names The possible names this file has
+     * @return The name if found, null if not
+     * @throws Exception If the remote connection or IO fails
+     */
     @Override
     public String get_filename(String hash, List<String> names) throws Exception {
         for (String name : names) {
@@ -388,6 +404,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return ((int) Math.ceil(file.length() / (float) slice_size));
     }
 
+    /**
+     * When downloading a file, this confirms the downloader if the file is whole or if it will be downloaded by chunks
+     * If separating in chunks is necessary, it is done and all hashes returned
+     * @param hash The hash of the whole file
+     * @return Hashes needed to download the whole file
+     * @throws Exception If something fails
+     */
     @Override
     public List<String> getHashesNeeded(String hash) throws Exception {
         Content to_download = null;
