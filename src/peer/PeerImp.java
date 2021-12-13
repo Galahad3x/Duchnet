@@ -1,7 +1,6 @@
 package peer;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.rmi.NotBoundException;
@@ -42,9 +41,20 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      */
     public Registry registry;
 
+    /**
+     * Thread that will run all the time, managing a queue of file threads
+     */
     public GlobalQueueThread file_queue_thread;
+    /**
+     * Thread that will run all the time, managing a queue of download threads
+     */
     public GlobalQueueThread download_queue_thread;
 
+    /**
+     * Logger class used to show messages to the user
+     * INFO level is disabled by default, used to debug
+     * WARNING and SEVERE are always on, they show errors
+     */
     public static Logger logger = Logger.getLogger("peer");
 
     /**
@@ -110,28 +120,40 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         // configurar registry ip i registry port
         this.own_info = own_info;
         this.registry = reg;
-        int download_threads = 4;
-        int upload_threads = 4;
-        int file_threads = 4;
+        int download_threads;
+        int upload_threads;
+        int file_threads;
         Scanner scanner = new Scanner(System.in);
         System.out.println("Type the route to the files: ");
         String file_route = scanner.nextLine();
         System.out.println("Type the maximum number of download threads: ");
         try {
             download_threads = Integer.parseInt(scanner.nextLine());
+            if (download_threads < 1){
+                throw new NumberFormatException();
+            }
         } catch (NumberFormatException e) {
+            download_threads = 4;
             logger.info("Couldn't parse the number, setting default 4");
         }
         System.out.println("Type the maximum number of upload threads: ");
         try {
             upload_threads = Integer.parseInt(scanner.nextLine());
+            if (upload_threads < 1){
+                throw new NumberFormatException();
+            }
         } catch (NumberFormatException e) {
+            upload_threads = 4;
             logger.info("Couldn't parse the number, setting default 4");
         }
         System.out.println("Type the maximum number of file threads: ");
         try {
             file_threads = Integer.parseInt(scanner.nextLine());
+            if (file_threads < 1){
+                throw new NumberFormatException();
+            }
         } catch (NumberFormatException e) {
+            file_threads = 4;
             logger.info("Couldn't parse the number, setting default 4");
         }
         Semaphore upload_semaphore = new Semaphore(upload_threads);
@@ -212,6 +234,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     }
                     break;
                 case "debug":
+                    // Switch between debug modes
                     if (logger.getLevel().equals(Level.INFO)) {
                         logger.info("Setting debug level to WARNING");
                         logger.setLevel(Level.WARNING);
@@ -221,6 +244,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     }
                     break;
                 case "progress":
+                    // Print the current download progress
                     System.out.println("+++++++++++++++++++++");
                     this.download_queue_thread.printProgress();
                     System.out.println("---------------------");
@@ -230,6 +254,13 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    /**
+     * All the progress necessary to start a download
+     *
+     * @param search_term   The search term we will search for
+     * @param search_method description|tag|name, the thing that we will search by
+     * @throws Exception If something fails
+     */
     public void download_file(String search_term, String search_method) throws Exception {
         if (search_method.equals("")) {
             search_method = "name";
@@ -309,7 +340,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     }
 
     /**
-     * Fetch a file from a remote host
+     * Start to fetch a file from a number of remote hosts
      *
      * @param file_to_download The file to download, without filedata
      * @param filename         The filename to save the file in
@@ -354,9 +385,18 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         List<MyThread> threads = new LinkedList<>();
         for (String hash : hashes) {
-            file_location = this.manager.getFolder_route() + "/" + manager.get_filename(hash, file_to_download.getFilenames());
-            threads.add(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers,
-                    hash, file_location, hashes, this.manager, filename));
+            boolean to_add = true;
+            for (Content content : this.manager.getContents()) {
+                if (content.getHash().equals(hash)) {
+                    to_add = false;
+                    break;
+                }
+            }
+            if (to_add) {
+                file_location = this.manager.getFolder_route() + "/" + manager.get_filename(hash, file_to_download.getFilenames());
+                threads.add(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers,
+                        hash, file_location, hashes, this.manager, filename));
+            }
         }
         file_queue_thread.add_threads(threads);
     }
@@ -409,18 +449,32 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         return file_to_download;
     }
 
+    /**
+     * A thread that manages a queue of threads
+     * When a thread is done this thread is alerted, to make way for the next one
+     */
     public static class GlobalQueueThread extends Thread {
         final Queue<MyThread> queue;
         final MyThread[] active;
         boolean running = true;
         final Object lck;
 
+        /**
+         * Constructor for a queue thread
+         *
+         * @param allowed the number of active threads allowed at once
+         */
         public GlobalQueueThread(int allowed) {
             queue = new LinkedList<>();
             active = new MyThread[allowed];
             lck = new Object();
         }
 
+        /**
+         * Run method of the thread, which runs forever.
+         * Loops forever, only releasing the synchronized when no new threads can be activated
+         * When the queue is modified, it wakes up to see if it's possible to activate a new thread
+         */
         @Override
         public void run() {
             try {
@@ -458,6 +512,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
         }
 
+        /**
+         * Used by other threads after finishing waking up this thread at the wait()
+         *
+         * @param alerting The thread alerting this one, used to set its finished attribute
+         */
         public void alert(DownloadThread alerting) {
             logger.info("Main thread awaits critical zone");
             synchronized (this) {
@@ -470,6 +529,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             logger.info("Main thread is out of critical zone");
         }
 
+        /**
+         * Executed by other threads, adds a list of threads to the queue and notifies
+         *
+         * @param threads All the threads added to the queue
+         */
         public void add_threads(List<MyThread> threads) {
             logger.info("Other thread awaits critical zone on " + this.getName());
             synchronized (this) {
@@ -484,6 +548,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             logger.info("Main thread is out of critical zone");
         }
 
+        /**
+         * Print the progress of current downloads/files
+         */
         public void printProgress() {
             List<String> progress = new LinkedList<>();
             for (MyThread thread : this.active) {
@@ -498,6 +565,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    /**
+     * Thread used to handle the download threads of a single file (or chunk)
+     * Its job is to add the download threads to the queue and wait for them all to finish, nad finally write the file to the disk
+     */
     public static class FileQueueThread extends MyThread {
         final GlobalQueueThread file_queue_thread;
         final GlobalQueueThread download_queue_thread;
@@ -509,6 +580,18 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         final ContentManager manager;
         final String original_name;
 
+        /**
+         * Constructor for a file thread
+         *
+         * @param file_thread      Thread managing all file threads
+         * @param download_thread  Thread managing all download threads
+         * @param seed_managers    All the managers that own the file
+         * @param hash_to_download Hash of the file we want to download
+         * @param file_location    Location where to save this file
+         * @param friend_hashes    If the file is a chunk, all the hashes needed to rebuild original file
+         * @param manager          The manager of this PeerImp
+         * @param name             The name of the whole file, if it needs to be rebuilt
+         */
         public FileQueueThread(GlobalQueueThread file_thread, GlobalQueueThread download_thread,
                                List<Manager> seed_managers, String hash_to_download, String file_location,
                                List<String> friend_hashes, ContentManager manager, String name) {
@@ -523,6 +606,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             this.original_name = name;
         }
 
+        /**
+         * Creates all downloads and adds them to the queue
+         */
         @Override
         public void run() {
             try {
@@ -540,11 +626,19 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
         }
 
+        /**
+         * Creates the array where the bytes will be saved
+         *
+         * @throws Exception If the remote call to the manager fails
+         */
         public void create_slice_array() throws Exception {
             this.slices_array = new ByteSlice[this.seed_managers.get(0).getSlicesNeeded(hash_to_download)];
             logger.info("Created slice array");
         }
 
+        /**
+         * Write the bytes in a file, and if it's a chunk, rebuild if possible
+         */
         public void write_file() {
             logger.info("Starting to write " + this.hash_to_download);
             try (FileOutputStream stream = new FileOutputStream(file_location)) {
@@ -569,6 +663,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
         }
 
+        /**
+         * If a file is a chunk, check if it's possible to rebuild the whole file
+         * If it is possible, rebuild the whole file and delete remaining chunks
+         */
         public void check_rebuildability() {
             this.manager.list_filtered_files("name:" + this.original_name);
             for (String hash : this.friend_hashes) {
@@ -599,13 +697,18 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 logger.warning("ERROR while joining the files; Try merging manually");
             } finally {
                 for (File f : files) {
-                    if (!f.delete()){
+                    if (!f.delete()) {
                         logger.info("ERROR deleting file chunk");
                     }
                 }
             }
         }
 
+        /**
+         * Check if the thread has finished, which means that all downloads have finished
+         *
+         * @return true if all downloads have been completed
+         */
         public boolean isFinished() {
             for (ByteSlice slice : slices_array) {
                 if (slice == null) {
@@ -615,6 +718,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             return true;
         }
 
+        /**
+         * Get the number of threads that have finished, and the total number in a string
+         *
+         * @return a string of the style hash:threads_finished/total_threads
+         */
         public String get_progress() {
             int completed = 0;
             for (ByteSlice slice : slices_array) {
@@ -626,6 +734,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
     }
 
+    /**
+     * A thread that manages a download
+     */
     public static class DownloadThread extends MyThread {
         final GlobalQueueThread download_queue_thread;
         final FileQueueThread file_thread;
@@ -633,6 +744,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         int slice_index;
         boolean finished;
 
+        /**
+         * Constructor used to create a download thread
+         *
+         * @param download_thread the thread that manages downloads
+         * @param file_thread     the thread that manages the file that we want to download
+         * @param seed_manager    one of the managers that owns the file
+         * @param slice_index     the 1 MB slice we will request from the seed manager
+         */
         public DownloadThread(GlobalQueueThread download_thread, FileQueueThread file_thread, Manager seed_manager, int slice_index) {
             this.download_queue_thread = download_thread;
             this.seed_manager = seed_manager;
@@ -641,6 +760,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             this.finished = false;
         }
 
+        /**
+         * Run method of the thread, requests the data from the seed manager and writes it to the file
+         * that manages the whole download
+         */
         @Override
         public void run() {
             logger.info("Starting download thread " + this.file_thread.hash_to_download + " " + slice_index);

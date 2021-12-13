@@ -1,8 +1,6 @@
 package peer;
 
 import java.rmi.Remote;
-import java.rmi.RemoteException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface Manager extends Remote {
@@ -38,5 +36,12 @@ public interface Manager extends Remote {
      */
     Content get_information(String hash) throws Exception;
 
+    /**
+     * Get the filename a file is saved with in the seeder
+     * @param hash The hash of the file
+     * @param names The names this file might have
+     * @return The filename
+     * @throws Exception If something fails
+     */
     String get_filename(String hash, List<String> names) throws Exception;
 }

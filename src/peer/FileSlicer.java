@@ -2,15 +2,19 @@ package peer;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 public class FileSlicer {
-    private static File f;
 
+    /**
+     * Run a program used to split a file into chunks or join chunks into a file manually
+     * @param args System arguments. not used
+     * @throws IOException If IO fails
+     */
     public static void main(String[] args) throws IOException {
         Scanner scanner = new Scanner(System.in);
         System.out.println("COMMAND: ");
+        File f;
         if ("split".equals(scanner.nextLine())) {
             Scanner scanner2 = new Scanner(System.in);
             System.out.println("Select the route of the folder: ");
@@ -32,6 +36,11 @@ public class FileSlicer {
         }
     }
 
+    /**
+     * Split the given files into chunks
+     * @param f original file
+     * @throws IOException If writing or reading fails
+     */
     public static void splitFile(File f) throws IOException {
         int partCounter = 1;//I like to name parts from 001, 002, 003, ...
         //you can change it to 0 if you want 000, 001, ...
@@ -45,7 +54,7 @@ public class FileSlicer {
         try (FileInputStream fis = new FileInputStream(f);
              BufferedInputStream bis = new BufferedInputStream(fis)) {
 
-            int bytesAmount = 0;
+            int bytesAmount;
             while ((bytesAmount = bis.read(buffer)) > 0) {
                 //write each chunk of data into separate file with different number in name
                 String filePartName = String.format(".%0" + number_of_digits + "d%s", partCounter++, fileName);
@@ -57,13 +66,17 @@ public class FileSlicer {
         }
     }
 
+    /**
+     * Merge some chunks into the original file
+     * @param files All the chunks
+     * @param into The resulting whole file
+     * @throws IOException If writing or reading fails
+     */
     public static void mergeFilesOriginal(List<File> files, File into)
             throws IOException {
         try (FileOutputStream fos = new FileOutputStream(into);
              BufferedOutputStream mergingStream = new BufferedOutputStream(fos)) {
             for (File f : files) {
-                System.out.println(f.getPath());
-                System.out.println(f.length());
                 Files.copy(f.toPath(), mergingStream);
             }
         }

@@ -19,6 +19,12 @@ import java.util.List;
 
 public class XMLDatabase {
 
+    /**
+     * Read XML info from a file
+     * @param folder_route Route where the file is
+     * @param extra_files List where to add the data
+     * @return The list with the added data
+     */
     public static List<Content> read_from_file(String folder_route, List<Content> extra_files) {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         try {
@@ -56,6 +62,11 @@ public class XMLDatabase {
         return extra_files;
     }
 
+    /**
+     * Write XML info to content_info.xml
+     * @param folder_route THe folder where to save it
+     * @param files The files with the info we want to write
+     */
     public static void write_to_xml(String folder_route, List<Content> files) {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         // Save files even if they aren't there anymore
@@ -90,7 +101,6 @@ public class XMLDatabase {
                 tr.setOutputProperty(OutputKeys.INDENT, "yes");
                 tr.setOutputProperty(OutputKeys.METHOD, "xml");
                 tr.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-                // tr.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, "roles.dtd");
                 tr.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
 
                 // send DOM to file

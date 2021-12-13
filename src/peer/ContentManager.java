@@ -26,6 +26,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     private final int slice_size = 1024 * 1024;
 
+    /**
+     * Cache hashmap to store likely-to-be-downloaded files
+     */
+    private final HashMap<String, ByteSlice[]> cache;
+
+    /**
+     * Logger used to print INFO, WARNINGS and SEVERES
+     */
     private final Logger logger;
 
     /**
@@ -39,6 +47,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         this.folder_route = folder_route;
         this.contents = new ArrayList<>();
         this.upload_semaphore = upload_semaphore;
+        cache = new HashMap<>();
         this.logger = logger;
     }
 
@@ -60,7 +69,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         if (!add_data) {
             File f = new File(this.folder_route);
             List<Content> extra_files = new LinkedList<>();
-            for (File file : Objects.requireNonNull(f.listFiles())) {
+            for (File file : Objects.requireNonNull(f.listFiles(file -> !file.getName().startsWith(".")))) {
                 if (file.isFile()) {
                     Content this_file = null;
                     try {
@@ -323,23 +332,51 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         this.upload_semaphore.acquire();
         File file = new File(to_download.getLocal_route());
         byte[] bytes;
-        bytes = new byte[slice_size];
-        FileInputStream stream = new FileInputStream(file);
-        for (int i = 0; i <= slice_index; i++) {
-            for (int j = 0; j < slice_size; j++) {
-                int the_byte = stream.read();
-                if (i == slice_index && the_byte >= 0) {
-                    bytes[j] = (byte) the_byte;
-                } else if (the_byte < 0) {
-                    return new ByteSlice(bytes, j);
-                }
+        synchronized (cache) {
+            if (cache.containsKey(hash) && cache.get(hash)[slice_index] != null) {
+                this.upload_semaphore.release();
+                logger.info("Freed download thread");
+                return cache.get(hash)[slice_index];
             }
         }
-        this.upload_semaphore.release();
-        logger.info("Freed download thread");
-        return new ByteSlice(bytes, slice_size);
+        ByteSlice[] the_file = new ByteSlice[this.getSlicesNeeded(hash)];
+        try (FileInputStream stream = new FileInputStream(file)) {
+            for (int i = 0; i < this.getSlicesNeeded(hash); i++) {
+                bytes = new byte[slice_size];
+                int j;
+                for (j = 0; j < slice_size; j++) {
+                    int the_byte = stream.read();
+                    if (the_byte >= 0) {
+                        bytes[j] = (byte) the_byte;
+                    } else {
+                        break;
+                    }
+                }
+                the_file[i] = new ByteSlice(bytes, j);
+            }
+        }
+        synchronized (cache) {
+            if (cache.size() >= 4) {
+                logger.warning("Removing file from cache");
+                cache.remove((String) cache.keySet().toArray()[0]);
+            }
+            if (!cache.containsKey(hash)){
+                logger.warning("Adding file to cache");
+                cache.put(hash, the_file);
+            }
+            this.upload_semaphore.release();
+            logger.info("Freed download thread");
+            return cache.get(hash)[slice_index];
+        }
     }
 
+    /**
+     * Request a content's information from a seed
+     *
+     * @param hash The hash of the file we want
+     * @return The content, with the descriptions and the tags
+     * @throws Exception If the remote connection fails
+     */
     @Override
     public Content get_information(String hash) throws Exception {
         Content to_download = null;
@@ -354,6 +391,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return to_download;
     }
 
+    /**
+     * Return the name of a file as it is in the folder
+     *
+     * @param hash  The hash of the file
+     * @param names The possible names this file has
+     * @return The name if found, null if not
+     * @throws Exception If the remote connection or IO fails
+     */
     @Override
     public String get_filename(String hash, List<String> names) throws Exception {
         for (String name : names) {
@@ -388,6 +433,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return ((int) Math.ceil(file.length() / (float) slice_size));
     }
 
+    /**
+     * When downloading a file, this confirms the downloader if the file is whole or if it will be downloaded by chunks
+     * If separating in chunks is necessary, it is done and all hashes returned
+     *
+     * @param hash The hash of the whole file
+     * @return Hashes needed to download the whole file
+     * @throws Exception If something fails
+     */
     @Override
     public List<String> getHashesNeeded(String hash) throws Exception {
         Content to_download = null;
