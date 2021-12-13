@@ -486,7 +486,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         synchronized (lck) {
                             for (int i = 0; i < this.active.length; i++) {
                                 if (this.active[i] != null && this.active[i].isFinished()) {
-                                    this.active[i].write_file();
+                                    // this.active[i].write_file();
                                     // Per evitar el deadlock de alert()
                                     if (!this.active[i].getState().equals(State.BLOCKED)) {
                                         this.active[i].join(2000);
@@ -715,6 +715,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     return false;
                 }
             }
+            this.write_file();
             return true;
         }
 

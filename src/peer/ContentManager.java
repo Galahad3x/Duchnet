@@ -113,7 +113,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 return true;
             }
             if (restriction_method.equals("name")) {
-                return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
+                return !file.getName().startsWith(".") && file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
             }
             return true;
         };
