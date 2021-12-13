@@ -1,8 +1,6 @@
 package peer;
 
 import java.rmi.Remote;
-import java.rmi.RemoteException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface Manager extends Remote {

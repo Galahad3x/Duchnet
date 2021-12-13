@@ -2,11 +2,9 @@ package peer;
 
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 
 public class FileSlicer {
-    private static File f;
 
     /**
      * Run a program used to split a file into chunks or join chunks into a file manually
@@ -16,6 +14,7 @@ public class FileSlicer {
     public static void main(String[] args) throws IOException {
         Scanner scanner = new Scanner(System.in);
         System.out.println("COMMAND: ");
+        File f;
         if ("split".equals(scanner.nextLine())) {
             Scanner scanner2 = new Scanner(System.in);
             System.out.println("Select the route of the folder: ");
@@ -78,8 +77,6 @@ public class FileSlicer {
         try (FileOutputStream fos = new FileOutputStream(into);
              BufferedOutputStream mergingStream = new BufferedOutputStream(fos)) {
             for (File f : files) {
-                System.out.println(f.getPath());
-                System.out.println(f.length());
                 Files.copy(f.toPath(), mergingStream);
             }
         }
