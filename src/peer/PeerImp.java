@@ -404,9 +404,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         hash, file_location, hashes, this.manager, filename));
             }
         }
-        logger.warning("ADDING THREADS");
+        logger.info("ADDING THREADS");
         file_queue_thread.add_threads(threads);
-        logger.warning("Done");
+        logger.info("Done");
     }
 
     /**
