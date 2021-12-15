@@ -4,6 +4,9 @@ import java.io.*;
 import java.nio.file.Files;
 import java.util.*;
 
+/**
+ * Used to slice large files in 25 MB slices
+ */
 public class FileSlicer {
 
     /**

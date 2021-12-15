@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
+/**
+ * Used to calculate CRC32 hash of a file
+ */
 public class HashCalculator {
     /**
      * Get the hash of a file

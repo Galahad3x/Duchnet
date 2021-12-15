@@ -2,6 +2,9 @@ package peer;
 
 import java.io.Serializable;
 
+/**
+ * Encapsulation of an IP and port
+ */
 public class PeerInfo implements Serializable {
     /**
      * IP of a node

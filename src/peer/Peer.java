@@ -4,6 +4,9 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
 
+/**
+ * All the remote methods of a Peer, the basic element of a Node
+ */
 public interface Peer extends Remote {
     /**
      * Add the Peer and Manager of another node, not remote

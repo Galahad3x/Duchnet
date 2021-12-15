@@ -2,6 +2,9 @@ package peer;
 
 import java.io.Serializable;
 
+/**
+ * A chunk of maximum 1 MB of data from a file
+ */
 public class ByteSlice implements Serializable {
     private final byte[] bytes;
     private final int bytes_written;

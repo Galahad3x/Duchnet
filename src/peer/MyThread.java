@@ -1,16 +1,14 @@
 package peer;
 
+/**
+ * Abstract class defining extra functionalities for a Thread
+ */
 public abstract class MyThread extends Thread {
     /**
      * Check if a thread has finished
      * @return True if the thread can be joined
      */
     public abstract boolean isFinished();
-
-    /**
-     * Write byte data into a file
-     */
-    public abstract void write_file();
 
     /**
      * Get the progress of this thread

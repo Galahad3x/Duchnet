@@ -3,6 +3,9 @@ package peer;
 import java.rmi.Remote;
 import java.util.List;
 
+/**
+ * Defines the remote functions available for a Manager, which controls contents in a node
+ */
 public interface Manager extends Remote {
     /**
      * Given a hash, return the Content with a file_data, called remotely

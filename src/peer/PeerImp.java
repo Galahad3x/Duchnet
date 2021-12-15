@@ -13,6 +13,9 @@ import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Implementation of a peer in the network
+ */
 public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
@@ -354,7 +357,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
         // Do not transfer a file that is already owned by the user
         if (seeders.contains(this.own_info)) {
-            logger.info("You already own this file, aborting download...");
+            logger.warning("You already own this file, aborting download...");
             return;
         }
         // Request the file from a known seeder if possible
@@ -372,7 +375,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         String file_location;
         logger.info("Adding " + filename + " to the download queue");
 
-        int rand = new Random(seed_managers.size()).nextInt() % seed_managers.size();
+        int rand = (new Random().nextInt()) % seed_managers.size();
+        if (rand < 0){
+            rand = 0;
+        }
         Manager manager = seed_managers.get(rand);
         try {
             Content info = manager.get_information(file_to_download.getHash());
@@ -398,7 +404,9 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         hash, file_location, hashes, this.manager, filename));
             }
         }
+        logger.warning("ADDING THREADS");
         file_queue_thread.add_threads(threads);
+        logger.warning("Done");
     }
 
     /**
@@ -782,10 +790,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
 
         public boolean isFinished() {
             return finished;
-        }
-
-        @Override
-        public void write_file() {
         }
 
         @Override

@@ -3,6 +3,9 @@ package peer;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * A class encapsulating all the data relating to a piece of content
+ */
 public class Content implements Serializable {
     /**
      * The bytes of the file, only used when sending the file to a Peer

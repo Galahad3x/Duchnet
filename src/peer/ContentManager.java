@@ -8,6 +8,9 @@ import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
+/**
+ * Implementation of a Manager
+ */
 public class ContentManager extends UnicastRemoteObject implements Remote, Manager {
     /**
      * The route where we take files from and where we will save the ones we download
@@ -113,7 +116,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 return true;
             }
             if (restriction_method.equals("name")) {
-                return !file.getName().startsWith(".") && file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
+                return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
             }
             return true;
         };
@@ -265,6 +268,16 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      */
     public void print_contents(List<Content> contents) {
         for (Content content : contents) {
+            boolean to_skip = false;
+            for (String filename : content.getFilenames()) {
+                if (filename.startsWith(".")) {
+                    to_skip = true;
+                    break;
+                }
+            }
+            if (to_skip){
+                continue;
+            }
             System.out.println(content.getFilenames());
             System.out.println(content.getFileDescriptions());
             System.out.println(content.getTags());
@@ -357,11 +370,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         }
         synchronized (cache) {
             if (cache.size() >= 4) {
-                logger.warning("Removing file from cache");
+                logger.info("Removing file from cache");
                 cache.remove((String) cache.keySet().toArray()[0]);
             }
-            if (!cache.containsKey(hash)){
-                logger.warning("Adding file to cache");
+            if (!cache.containsKey(hash)) {
+                logger.info("Adding file to cache");
                 cache.put(hash, the_file);
             }
             this.upload_semaphore.release();

@@ -7,9 +7,13 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Enumeration;
 
+/**
+ * Main program to run a node
+ */
 public class PeerProgram {
     /**
      * Execute a node
+     *
      * @param args args of the program [own_port] [other_ip] [other_port]
      * @throws Exception if something fails
      */
@@ -45,11 +49,13 @@ public class PeerProgram {
         String ip_str = null;
         while (e.hasMoreElements()) {
             NetworkInterface n = e.nextElement();
-            if (n.getName().equals("eth0") || n.getName().equals("wlan0")) {
+            if (n.getName().equals("enp2s0") || n.getName().equals("eth0") || n.getName().equals("wlan0")) {
                 Enumeration<InetAddress> adresses = n.getInetAddresses();
                 do {
                     ip_str = adresses.nextElement().getHostAddress();
                 } while (!ip_str.startsWith("1"));
+            } else {
+                ip_str = "127.0.0.1";
             }
         }
         peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)), reg);
