@@ -418,7 +418,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     @Override
     public String get_filename(String hash, List<String> names) throws Exception {
         for (String name : names) {
-            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name) && !fi.getName().startsWith(name)))) {
+            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name)))) {
                 if (hash.equals(HashCalculator.getFileHash(f))) {
                     return f.getName();
                 }

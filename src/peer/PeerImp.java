@@ -380,8 +380,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             rand = 0;
         }
 
-        Manager manager = seed_managers.get(rand);
-        List<String> hashes = manager.getHashesNeeded(file_to_download.getHash());
+        Manager r_manager = seed_managers.get(rand);
+        List<String> hashes = r_manager.getHashesNeeded(file_to_download.getHash());
 
         List<MyThread> threads = new LinkedList<>();
         for (String hash : hashes) {
@@ -393,7 +393,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 }
             }
             if (to_add) {
-                file_location = this.manager.getFolder_route() + "/" + manager.get_filename(hash, file_to_download.getFilenames());
+                file_location = this.manager.getFolder_route() + "/" + r_manager.get_filename(hash, file_to_download.getFilenames());
                 threads.add(new FileQueueThread(file_queue_thread, download_queue_thread, seed_managers,
                         hash, file_location, hashes, this.manager, filename));
             }
@@ -402,7 +402,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         file_queue_thread.add_threads(threads);
         logger.info("Done");
         try {
-            Content info = manager.get_information(file_to_download.getHash());
+            Content info = r_manager.get_information(file_to_download.getHash());
             ContentManager.merge_lists(this.manager.getContents(), Collections.singletonList(info));
         } catch (Exception e) {
             logger.warning("Something failed while retrieving data");
