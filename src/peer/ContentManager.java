@@ -93,6 +93,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
             XMLDatabase.read_from_file(this.folder_route, extra_files);
             XMLDatabase.write_to_xml(this.folder_route, extra_files);
+            // TODO Cridar al ServiceClient
+            // ServiceClient.getDescriptions(String hash)
             merge_lists(contents, extra_files);
         } else {
             update_files();
