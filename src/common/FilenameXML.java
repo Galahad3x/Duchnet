@@ -7,13 +7,13 @@ import java.util.List;
 /**
  * Used to represent data in XML format
  */
-public class DescriptionXML {
+public class FilenameXML {
     public String hash;
     @JacksonXmlElementWrapper(useWrapping = false)
-    public List<String> description;
+    public List<String> filename;
 
-    public DescriptionXML(String hash, List<String> descriptions) {
+    public FilenameXML(String hash, List<String> filenames) {
         this.hash = hash;
-        this.description = descriptions;
+        this.filename = filenames;
     }
 }
