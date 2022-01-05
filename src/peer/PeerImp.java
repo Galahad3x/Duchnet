@@ -192,7 +192,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "quit":
                     // Quits the application and shuts down the node
                     System.out.println("Quitting...");
-                    XMLDatabase.write_to_xml(this.manager.getFolder_route(), this.manager.getContents());
+
                     System.exit(0);
                 case "help":
                     // Prints a help message
