@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequestWithBody;
 import common.ContentXML;
@@ -11,10 +12,16 @@ import common.DescriptionXML;
 import common.FilenameXML;
 import common.TagXML;
 
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 @SuppressWarnings("unchecked")
 public class ServiceClient {
@@ -23,6 +30,8 @@ public class ServiceClient {
 
     public ServiceClient(Logger logger) {
         this.logger = logger;
+        Logger.getLogger("org.apache.commons.httpclient").setLevel(Level.SEVERE);
+        Logger.getLogger("httpclient").setLevel(Level.SEVERE);
     }
 
     public List<ContentXML> getEverything() throws UnirestException, JsonProcessingException {
@@ -38,30 +47,45 @@ public class ServiceClient {
         List<ContentXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
-            ContentXML content = new ContentXML((String) hmap.get("hash"), (List<String>) hmap.get("filename"), (List<String>) hmap.get("description"), (List<String>) hmap.get("tag"));
+            List<String> fname = (List<String>) hmap.get("filename");
+            List<String> descs = (List<String>) hmap.get("description");
+            List<String> tgs = (List<String>) hmap.get("tag");
+            ContentXML content = new ContentXML((String) hmap.get("hash"), fname, descs, tgs);
             retval.add(content);
         }
         return retval;
     }
 
-    public List<ContentXML> getEverything(String hash) throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/contents/{hash}")
-                .routeParam("hash", hash)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+    public ContentXML getEverything(String hash) throws UnirestException, IOException {
+        URL url = new URL("http://localhost:8080/v1/contents/" + hash);
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("GET");
+        con.setDoOutput(true);
+        OutputStream os = con.getOutputStream();
+        OutputStreamWriter osw = new OutputStreamWriter(os, StandardCharsets.UTF_8);
+        osw.write("Just Some Text");
+        osw.flush();
+        osw.close();
+        os.close();  //don't forget to close the OutputStream
+        con.connect();
+
+        String result;
+        BufferedInputStream bis = new BufferedInputStream(con.getErrorStream());
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        int result2 = bis.read();
+        while(result2 != -1) {
+            buf.write((byte) result2);
+            result2 = bis.read();
+        }
+        result = buf.toString();
+        System.out.println(result);
+        if (con.getResponseCode() != 200) {
+            logger.info("Request to web server failed " + con.getResponseCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
-        List<ContentXML> retval = new LinkedList<>();
-        for (Object XML : XMLs) {
-            LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
-            ContentXML content = new ContentXML((String) hmap.get("hash"), (List<String>) hmap.get("filename"), (List<String>) hmap.get("description"), (List<String>) hmap.get("tag"));
-            retval.add(content);
-        }
-        return retval;
+        // System.out.println(response.getBody());
+        return new XmlMapper().readValue(result, ContentXML.class);
     }
 
 

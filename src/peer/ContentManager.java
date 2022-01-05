@@ -73,7 +73,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return this.contents;
     }
 
-    public void databaseUpdate(){
+    public void databaseUpdate() {
         for (Content content : contents) {
             try {
                 for (String desc : content.getFileDescriptions()) {
@@ -85,23 +85,25 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 for (String tag : content.getTags()) {
                     serviceClient.postTag(content.getHash(), tag);
                 }
-            }catch (UnirestException e){
+            } catch (UnirestException e) {
                 logger.info("Request error");
             }
             try {
-                for (ContentXML cXML : serviceClient.getEverything(content.getHash())) {
-                    for (String desc : cXML.description){
-                        content.add_alternative_description(desc);
-                    }
-                    for (String name : cXML.filename){
-                        content.add_alternative_name(name);
-                    }
-                    for (String tag : cXML.tag){
-                        content.add_tag(tag);
-                    }
+                ContentXML cXML = serviceClient.getEverything(content.getHash());
+                System.out.println(cXML.description);
+                for (String desc : cXML.description) {
+                    content.add_alternative_description(desc);
+                }
+                for (String name : cXML.filename) {
+                    content.add_alternative_name(name);
+                }
+                for (String tag : cXML.tag) {
+                    content.add_tag(tag);
                 }
             } catch (UnirestException | JsonProcessingException e) {
                 logger.info("Some error while processing XML");
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
