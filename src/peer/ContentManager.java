@@ -90,19 +90,25 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
             try {
                 ContentXML cXML = serviceClient.getEverything(content.getHash());
-                System.out.println(cXML.description);
-                for (String desc : cXML.description) {
-                    content.add_alternative_description(desc);
+                System.out.println("Fora");
+                System.out.println(cXML);
+                if (cXML.description != null) {
+                    for (String desc : cXML.description) {
+                        content.add_alternative_description(desc);
+                    }
                 }
-                for (String name : cXML.filename) {
-                    content.add_alternative_name(name);
+                if (cXML.filename != null) {
+                    for (String name : cXML.filename) {
+                        content.add_alternative_name(name);
+                    }
                 }
-                for (String tag : cXML.tag) {
-                    content.add_tag(tag);
+                if (cXML.tag != null) {
+                    for (String tag : cXML.tag) {
+                        content.add_tag(tag);
+                    }
                 }
-            } catch (UnirestException | JsonProcessingException e) {
-                logger.info("Some error while processing XML");
-            } catch (IOException e) {
+            } catch (UnirestException | IOException e) {
+                logger.severe("Some error while processing XML");
                 e.printStackTrace();
             }
         }

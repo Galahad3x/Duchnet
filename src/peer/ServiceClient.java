@@ -11,6 +11,7 @@ import common.ContentXML;
 import common.DescriptionXML;
 import common.FilenameXML;
 import common.TagXML;
+import org.apache.tomcat.jni.Time;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -57,35 +58,19 @@ public class ServiceClient {
     }
 
     public ContentXML getEverything(String hash) throws UnirestException, IOException {
-        URL url = new URL("http://localhost:8080/v1/contents/" + hash);
-        HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        con.setRequestMethod("GET");
-        con.setDoOutput(true);
-        OutputStream os = con.getOutputStream();
-        OutputStreamWriter osw = new OutputStreamWriter(os, StandardCharsets.UTF_8);
-        osw.write("Just Some Text");
-        osw.flush();
-        osw.close();
-        os.close();  //don't forget to close the OutputStream
-        con.connect();
-
-        String result;
-        BufferedInputStream bis = new BufferedInputStream(con.getErrorStream());
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        int result2 = bis.read();
-        while(result2 != -1) {
-            buf.write((byte) result2);
-            result2 = bis.read();
-        }
-        result = buf.toString();
-        System.out.println(result);
-        if (con.getResponseCode() != 200) {
-            logger.info("Request to web server failed " + con.getResponseCode());
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
+                "http://localhost:8080/v1/contents/{hash}")
+                .routeParam("hash", hash)
+                .asString();
+        if (response.getStatus() != 200) {
+            logger.info("Request to web server failed " + response.getStatusText());
             return null;
         }
         logger.info("Request to web server successful");
-        // System.out.println(response.getBody());
-        return new XmlMapper().readValue(result, ContentXML.class);
+        String body = response.getBody();
+        logger.severe(body);
+        ContentXML value = new XmlMapper().readValue(body, ContentXML.class);
+        return value;
     }
 
 
