@@ -175,7 +175,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         if (!add_data) {
             File f = new File(this.folder_route);
             List<Content> extra_files = new LinkedList<>();
-            for (File file : Objects.requireNonNull(f.listFiles(file -> !file.getName().startsWith(".")))) {
+            for (File file : Objects.requireNonNull(f.listFiles())) {
                 if (file.isFile()) {
                     Content this_file = null;
                     try {
@@ -209,18 +209,21 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     public void list_filtered_files(String restriction) {
         File f = new File(this.folder_route);
         List<Content> extra_files = new LinkedList<>();
-        FileFilter filter = file -> {
-            String restriction_method = restriction.split(":")[0];
-            String restriction_term;
-            try {
-                restriction_term = restriction.split(":")[1];
-            } catch (IndexOutOfBoundsException e) {
+        FileFilter filter = new FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                String restriction_method = restriction.split(":")[0];
+                String restriction_term;
+                try {
+                    restriction_term = restriction.split(":")[1];
+                } catch (IndexOutOfBoundsException e) {
+                    return true;
+                }
+                if (restriction_method.equals("name")) {
+                    return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
+                }
                 return true;
             }
-            if (restriction_method.equals("name")) {
-                return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
-            }
-            return true;
         };
         for (File file : Objects.requireNonNull(f.listFiles(filter))) {
             if (file.isFile()) {
@@ -478,7 +481,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     @Override
     public String get_filename(String hash, List<String> names) throws Exception {
         for (String name : names) {
-            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name) && !fi.getName().startsWith(name)))) {
+            for (File f : Objects.requireNonNull(new File(this.folder_route).listFiles(fi -> fi.getName().endsWith(name)))) {
                 if (hash.equals(HashCalculator.getFileHash(f))) {
                     return f.getName();
                 }

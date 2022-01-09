@@ -46,16 +46,14 @@ public class PeerProgram {
         }
         Registry reg = startRegistry(Integer.parseInt(own_port));
         Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
-        String ip_str = null;
+        String ip_str = "127.0.0.1";
         while (e.hasMoreElements()) {
             NetworkInterface n = e.nextElement();
-            if (n.getName().equals("enp2s0") || n.getName().equals("eth0") || n.getName().equals("wlan0")) {
+            if (n.getName().equals("enp2s0") || n.getName().equals("eth0") || n.getName().equals("wlan0") || n.getName().equals("eno1")) {
                 Enumeration<InetAddress> adresses = n.getInetAddresses();
                 do {
                     ip_str = adresses.nextElement().getHostAddress();
                 } while (!ip_str.startsWith("1"));
-            } else {
-                ip_str = "127.0.0.1";
             }
         }
         peer.start(new PeerInfo(ip_str, Integer.parseInt(own_port)), reg);
