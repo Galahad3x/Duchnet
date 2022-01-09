@@ -4,7 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import common.ContentXML;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -32,6 +35,10 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * The size of a slice that will be sent over the network, 1 MB (in bytes)
      */
     private final int slice_size = 1024 * 1024;
+    /**
+     * Own peerInfo for web services peers
+     */
+    private final PeerInfo info;
 
     /**
      * Cache hashmap to store likely-to-be-downloaded files
@@ -54,7 +61,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * @param folder_route the route of the folder
      * @throws RemoteException when remote calls fail
      */
-    public ContentManager(String folder_route, Semaphore upload_semaphore, Logger logger) throws RemoteException {
+    public ContentManager(String folder_route, Semaphore upload_semaphore, Logger logger, PeerInfo info) throws RemoteException {
         super();
         this.folder_route = folder_route;
         this.contents = new ArrayList<>();
@@ -62,6 +69,44 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         cache = new HashMap<>();
         this.logger = logger;
         this.serviceClient = new ServiceClient(logger);
+        this.info = info;
+    }
+
+    /**
+     * Merge two content lists, merging same files into a single Content
+     *
+     * @param original The original list and the one returned
+     * @param extra    The files to add to original
+     */
+    public static void merge_lists(List<Content> original, List<Content> extra) {
+        for (Content this_file : extra) {
+            boolean found = false;
+            for (Content content : original) {
+                if (content.getHash().equals(this_file.getHash())) {
+                    found = true;
+                    if (!this_file.getFilenames().get(0).equals("")) {
+                        for (String name : this_file.getFilenames()) {
+                            if (!content.getFilenames().contains(name)) {
+                                content.add_alternative_name(name);
+                            }
+                        }
+                    }
+                    for (String desc : this_file.getFileDescriptions()) {
+                        if (!desc.equals("") && !content.getFileDescriptions().contains(desc)) {
+                            content.add_alternative_description(desc.strip());
+                        }
+                    }
+                    for (String tag : this_file.getTags()) {
+                        if (!tag.equals("") && !content.getTags().contains(tag)) {
+                            content.add_tag(tag.strip());
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                original.add(this_file);
+            }
+        }
     }
 
     public String getFolder_route() {
@@ -74,6 +119,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     public void databaseUpdate() {
+        try {
+            serviceClient.deleteInfos(this.info);
+        } catch (UnirestException e) {
+            logger.info("Request error");
+        }
         for (Content content : contents) {
             try {
                 for (String desc : content.getFileDescriptions()) {
@@ -85,13 +135,12 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 for (String tag : content.getTags()) {
                     serviceClient.postTag(content.getHash(), tag);
                 }
+                serviceClient.postPeer(content.getHash(), this.info);
             } catch (UnirestException e) {
                 logger.info("Request error");
             }
             try {
                 ContentXML cXML = serviceClient.getEverything(content.getHash());
-                System.out.println("Fora");
-                System.out.println(cXML);
                 if (cXML.description != null) {
                     for (String desc : cXML.description) {
                         content.add_alternative_description(desc);
@@ -338,43 +387,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     /**
-     * Merge two content lists, merging same files into a single Content
-     *
-     * @param original The original list and the one returned
-     * @param extra    The files to add to original
-     */
-    public static void merge_lists(List<Content> original, List<Content> extra) {
-        for (Content this_file : extra) {
-            boolean found = false;
-            for (Content content : original) {
-                if (content.getHash().equals(this_file.getHash())) {
-                    found = true;
-                    if (!this_file.getFilenames().get(0).equals("")) {
-                        for (String name : this_file.getFilenames()) {
-                            if (!content.getFilenames().contains(name)) {
-                                content.add_alternative_name(name);
-                            }
-                        }
-                    }
-                    for (String desc : this_file.getFileDescriptions()) {
-                        if (!desc.equals("") && !content.getFileDescriptions().contains(desc)) {
-                            content.add_alternative_description(desc.strip());
-                        }
-                    }
-                    for (String tag : this_file.getTags()) {
-                        if (!tag.equals("") && !content.getTags().contains(tag)) {
-                            content.add_tag(tag.strip());
-                        }
-                    }
-                }
-            }
-            if (!found) {
-                original.add(this_file);
-            }
-        }
-    }
-
-    /**
      * Given a hash, return the Content with a file_data, called remotely
      *
      * @param hash the hash of the file to return
@@ -535,11 +547,38 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         return hashes;
     }
 
+    /**
+     * Get seeders of a hash from the web server
+     * @param hash Hash of the file
+     * @return List of seeders
+     */
     public List<PeerInfo> getSeeders(String hash) {
         try {
             return this.serviceClient.getSeeders(hash);
         } catch (UnirestException | JsonProcessingException e) {
             return new LinkedList<>();
         }
+    }
+
+    /**
+     * Register a user in the web service
+     * @param username Username
+     * @param password Password
+     * @return True if success
+     * @throws UnirestException If the request fails
+     */
+    public boolean register(String username, String password) throws UnirestException {
+        this.login(username, password);
+        return this.serviceClient.register();
+    }
+
+    /**
+     * Add the login info to the service client so it can be used in the requests
+     * @param username username
+     * @param password password
+     */
+    public void login(String username, String password) {
+        serviceClient.username = username;
+        serviceClient.password = password;
     }
 }

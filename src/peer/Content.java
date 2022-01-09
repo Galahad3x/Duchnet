@@ -8,17 +8,9 @@ import java.util.List;
  */
 public class Content implements Serializable {
     /**
-     * The bytes of the file, only used when sending the file to a Peer
-     */
-    private byte[] file_data;
-    /**
      * The filenames the file has, in the same host or on another
      */
     private final List<String> file_name;
-    /**
-     * Route where the file is, including subdirectories
-     */
-    private String local_route;
     /**
      * The descriptions the file has, in the same host or on another
      */
@@ -31,6 +23,14 @@ public class Content implements Serializable {
      * The tags the file has, in the same host or on another
      */
     private final List<String> tags;
+    /**
+     * The bytes of the file, only used when sending the file to a Peer
+     */
+    private byte[] file_data;
+    /**
+     * Route where the file is, including subdirectories
+     */
+    private String local_route;
 
     /**
      * Constructor used to create a Content
@@ -87,11 +87,11 @@ public class Content implements Serializable {
         this.local_route = local_route;
     }
 
-    public void setFile_data(byte[] file_data) {
-        this.file_data = file_data;
-    }
-
     public byte[] getFile_data() {
         return file_data;
+    }
+
+    public void setFile_data(byte[] file_data) {
+        this.file_data = file_data;
     }
 }

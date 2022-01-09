@@ -23,7 +23,7 @@ public class ContentXML {
         this.tag = tags;
     }
 
-    public ContentXML(){
+    public ContentXML() {
 
     }
 }

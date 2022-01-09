@@ -11,6 +11,7 @@ public class FileSlicer {
 
     /**
      * Run a program used to split a file into chunks or join chunks into a file manually
+     *
      * @param args System arguments. not used
      * @throws IOException If IO fails
      */
@@ -41,6 +42,7 @@ public class FileSlicer {
 
     /**
      * Split the given files into chunks
+     *
      * @param f original file
      * @throws IOException If writing or reading fails
      */
@@ -71,8 +73,9 @@ public class FileSlicer {
 
     /**
      * Merge some chunks into the original file
+     *
      * @param files All the chunks
-     * @param into The resulting whole file
+     * @param into  The resulting whole file
      * @throws IOException If writing or reading fails
      */
     public static void mergeFilesOriginal(List<File> files, File into)
