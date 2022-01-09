@@ -32,4 +32,13 @@ public class PeerInfo implements Serializable {
     public String toString(){
         return ip + ":" + port.toString();
     }
+
+    /**
+     * Rebuilds a PeerInfo from a string
+     * @param text the peerInfo in the toString() format
+     * @return a PeerInfo
+     */
+    public static PeerInfo fromString(String text){
+        return new PeerInfo(text.split(":")[0], Integer.parseInt(text.split(":")[1]));
+    }
 }

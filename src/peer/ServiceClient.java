@@ -4,30 +4,27 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequestWithBody;
 import common.ContentXML;
 import common.DescriptionXML;
 import common.FilenameXML;
 import common.TagXML;
-import org.apache.tomcat.jni.Time;
 
-import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @SuppressWarnings("unchecked")
 public class ServiceClient {
 
     private final Logger logger;
+
+    private final String protocol = "http://";
+    private final String baseurl = protocol + "localhost:8080/v1";
 
     public ServiceClient(Logger logger) {
         this.logger = logger;
@@ -37,7 +34,7 @@ public class ServiceClient {
 
     public List<ContentXML> getEverything() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/")
+                baseurl)
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed " + response.getStatusText());
@@ -59,7 +56,7 @@ public class ServiceClient {
 
     public ContentXML getEverything(String hash) throws UnirestException, IOException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/contents/{hash}")
+                baseurl +"/contents/{hash}")
                 .routeParam("hash", hash)
                 .asString();
         if (response.getStatus() != 200) {
@@ -69,14 +66,13 @@ public class ServiceClient {
         logger.info("Request to web server successful");
         String body = response.getBody();
         logger.severe(body);
-        ContentXML value = new XmlMapper().readValue(body, ContentXML.class);
-        return value;
+        return new XmlMapper().readValue(body, ContentXML.class);
     }
 
 
     public List<FilenameXML> getFilenames() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "filenames")
                 .asString();
         if (response.getStatus() != 200) {
@@ -95,7 +91,7 @@ public class ServiceClient {
 
     public List<FilenameXML> getFilenames(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "filenames")
                 .asString();
@@ -115,7 +111,7 @@ public class ServiceClient {
 
     public void deleteFilenames() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "filenames")
                 .asString();
         if (response.getStatus() != 200) {
@@ -126,14 +122,14 @@ public class ServiceClient {
 
     public void postFilename(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "filenames")
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    "http://localhost:8080/v1/contents/{hash}/{resource}")
+                    baseurl +"/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "filenames")
                     .body(text)
@@ -148,7 +144,7 @@ public class ServiceClient {
 
     public List<DescriptionXML> getDescriptions() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "descriptions")
                 .asString();
         if (response.getStatus() != 200) {
@@ -167,7 +163,7 @@ public class ServiceClient {
 
     public List<DescriptionXML> getDescriptions(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "descriptions")
                 .asString();
@@ -187,7 +183,7 @@ public class ServiceClient {
 
     public void deleteDescriptions() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "descriptions")
                 .asString();
         if (response.getStatus() != 200) {
@@ -198,14 +194,14 @@ public class ServiceClient {
 
     public void postDescription(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "descriptions")
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    "http://localhost:8080/v1/contents/{hash}/{resource}")
+                    baseurl +"/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "descriptions")
                     .body(text)
@@ -220,7 +216,7 @@ public class ServiceClient {
 
     public List<TagXML> getTags() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "tags")
                 .asString();
         if (response.getStatus() != 200) {
@@ -239,7 +235,7 @@ public class ServiceClient {
 
     public List<TagXML> getTags(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "tags")
                 .asString();
@@ -259,7 +255,7 @@ public class ServiceClient {
 
     public void deleteTags() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                "http://localhost:8080/v1/resources/{resource}")
+                baseurl +"/resources/{resource}")
                 .routeParam("resource", "tags")
                 .asString();
         if (response.getStatus() != 200) {
@@ -270,14 +266,14 @@ public class ServiceClient {
 
     public void postTag(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                "http://localhost:8080/v1/contents/{hash}/{resource}")
+                baseurl +"/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "tags")
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    "http://localhost:8080/v1/contents/{hash}/{resource}")
+                    baseurl +"/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "tags")
                     .body(text)
@@ -287,5 +283,25 @@ public class ServiceClient {
             }
         }
         logger.info("Request to web server successful");
+    }
+
+    public List<PeerInfo> getSeeders(String hash) throws UnirestException, JsonProcessingException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
+                baseurl +"/contents/{hash}/{resource}")
+                .routeParam("hash", hash)
+                .routeParam("resource", "peers")
+                .asString();
+        if (response.getStatus() != 200) {
+            logger.info("Request to web server failed " + response.getStatusText());
+            return null;
+        }
+        logger.info("Request to web server successful");
+        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<PeerInfo> retval = new LinkedList<>();
+        for (Object XML : XMLs) {
+            LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
+            retval.add(PeerInfo.fromString((String) hmap.get("item")));
+        }
+        return retval;
     }
 }

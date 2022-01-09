@@ -99,7 +99,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 }
                 if (cXML.filename != null) {
                     for (String name : cXML.filename) {
-                        content.add_alternative_name(name);
+                        if (!content.getFilenames().contains(name)) {
+                            content.add_alternative_name(name);
+                        }
                     }
                 }
                 if (cXML.tag != null) {
@@ -531,5 +533,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
         }
         return hashes;
+    }
+
+    public List<PeerInfo> getSeeders(String hash) {
+        try {
+            return this.serviceClient.getSeeders(hash);
+        } catch (UnirestException | JsonProcessingException e) {
+            return new LinkedList<>();
+        }
     }
 }
