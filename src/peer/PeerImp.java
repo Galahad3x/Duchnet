@@ -192,7 +192,6 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "quit":
                     // Quits the application and shuts down the node
                     System.out.println("Quitting...");
-                    XMLDatabase.write_to_xml(this.manager.getFolder_route(), this.manager.getContents());
                     System.exit(0);
                 case "help":
                     // Prints a help message
@@ -351,6 +350,12 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      */
     public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seeders(file_to_download, new LinkedList<>());
+        List<PeerInfo> seeders2 = this.manager.getSeeders(file_to_download.getHash());
+        for (PeerInfo p : seeders2){
+            if (!seeders.contains(p)){
+                seeders.add(p);
+            }
+        }
         if (seeders.size() == 0) {
             logger.severe("The file has no seeders");
             return;

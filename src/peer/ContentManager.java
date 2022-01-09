@@ -1,5 +1,9 @@
 package peer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.mashape.unirest.http.exceptions.UnirestException;
+import common.ContentXML;
+
 import java.io.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -40,6 +44,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     private final Logger logger;
 
     /**
+     * Service client used to call functions in the web service
+     */
+    private final ServiceClient serviceClient;
+
+    /**
      * Constructor for ContentManager
      *
      * @param folder_route the route of the folder
@@ -52,6 +61,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         this.upload_semaphore = upload_semaphore;
         cache = new HashMap<>();
         this.logger = logger;
+        this.serviceClient = new ServiceClient(logger);
     }
 
     public String getFolder_route() {
@@ -59,7 +69,51 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     public List<Content> getContents() {
-        return XMLDatabase.read_from_file(this.folder_route, contents);
+        databaseUpdate();
+        return this.contents;
+    }
+
+    public void databaseUpdate() {
+        for (Content content : contents) {
+            try {
+                for (String desc : content.getFileDescriptions()) {
+                    serviceClient.postDescription(content.getHash(), desc);
+                }
+                for (String name : content.getFilenames()) {
+                    serviceClient.postFilename(content.getHash(), name);
+                }
+                for (String tag : content.getTags()) {
+                    serviceClient.postTag(content.getHash(), tag);
+                }
+            } catch (UnirestException e) {
+                logger.info("Request error");
+            }
+            try {
+                ContentXML cXML = serviceClient.getEverything(content.getHash());
+                System.out.println("Fora");
+                System.out.println(cXML);
+                if (cXML.description != null) {
+                    for (String desc : cXML.description) {
+                        content.add_alternative_description(desc);
+                    }
+                }
+                if (cXML.filename != null) {
+                    for (String name : cXML.filename) {
+                        if (!content.getFilenames().contains(name)) {
+                            content.add_alternative_name(name);
+                        }
+                    }
+                }
+                if (cXML.tag != null) {
+                    for (String tag : cXML.tag) {
+                        content.add_tag(tag);
+                    }
+                }
+            } catch (UnirestException | IOException e) {
+                logger.severe("Some error while processing XML");
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -91,9 +145,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     extra_files.addAll(check_inside(file, null));
                 }
             }
-            XMLDatabase.read_from_file(this.folder_route, extra_files);
-            XMLDatabase.write_to_xml(this.folder_route, extra_files);
             merge_lists(contents, extra_files);
+            databaseUpdate();
         } else {
             update_files();
         }
@@ -143,8 +196,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
         }
         merge_lists(contents, extra_files);
-        XMLDatabase.read_from_file(this.folder_route, contents);
-        XMLDatabase.write_to_xml(this.folder_route, contents);
+        databaseUpdate();
     }
 
     /**
@@ -259,9 +311,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
             extra_contents.add(this_file);
         }
-        XMLDatabase.read_from_file(this.folder_route, extra_contents);
         merge_lists(contents, extra_contents);
-        XMLDatabase.write_to_xml(this.folder_route, contents);
+        databaseUpdate();
     }
 
     /**
@@ -278,7 +329,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     break;
                 }
             }
-            if (to_skip){
+            if (to_skip) {
                 continue;
             }
             System.out.println(content.getFilenames());
@@ -485,5 +536,13 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
         }
         return hashes;
+    }
+
+    public List<PeerInfo> getSeeders(String hash) {
+        try {
+            return this.serviceClient.getSeeders(hash);
+        } catch (UnirestException | JsonProcessingException e) {
+            return new LinkedList<>();
+        }
     }
 }
