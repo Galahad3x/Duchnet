@@ -118,7 +118,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * @throws IOException       if the Scanner fails
      * @throws NotBoundException if looking up a remote node fails
      */
-    public void start(PeerInfo own_info, Registry reg) throws IOException, NotBoundException {
+    public void start(PeerInfo own_info, Registry reg) throws IOException, NotBoundException, UnirestException {
         // configurar registry ip i registry port
         this.own_info = own_info;
         this.registry = reg;
@@ -182,7 +182,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * Service loop of the peer, runs forever until closed by the user
      * Listens for commands
      */
-    public void service_loop() throws RemoteException {
+    public void service_loop() throws RemoteException, UnirestException {
         Scanner scanner = new Scanner(System.in);
         while (true) {
             System.out.println("Please type a command: ");
@@ -191,6 +191,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "quit":
                     // Quits the application and shuts down the node
                     System.out.println("Quitting...");
+                    this.manager.deleteInfos();
                     System.exit(0);
                 case "help":
                     // Prints a help message
@@ -207,6 +208,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("PROGRESS\t\tShow information about downloads in motion");
                     System.out.println("REGISTER\t\tRegister in the web service");
                     System.out.println("LOGIN\t\t\tLogin to the web service in this session");
+                    System.out.println("CHANGE\t\t\tChange your password in the service");
                     break;
                 case "list":
                     // List files found locally without modifying
@@ -285,6 +287,20 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     String pass_word = scanner.nextLine();
                     this.manager.login(user_name, pass_word);
                     break;
+                case "change":
+                    System.out.println("Type new password: ");
+                    String pssword = scanner.nextLine();
+                    if(!this.manager.change_password(pssword)){
+                        logger.warning("PASSWORD CHANGE FAILED");
+                        break;
+                    }
+                    logger.warning("PASSWORD CHANGE SUCCESSFUL");
+                    break;
+                case "delete":
+                    System.out.println("Type hash, leave empty or cancel");
+                    String hash = scanner.nextLine();
+                    this.manager.delete(hash);
+                    break;
             }
         }
     }
@@ -301,6 +317,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             search_method = "name";
         }
         List<Content> network_contents = find_network_contents(new LinkedList<>(), search_method + ":" + search_term);
+        ContentManager.merge_lists(network_contents, this.manager.getServiceContents());
         Content file_to_download = let_user_choose_file(network_contents);
         if (file_to_download == null) {
             logger.warning("The file you specified has not been found, no download has been started");
@@ -413,7 +430,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         if (rand < 0) {
             rand = 0;
         }
-      
+        Manager r_manager = seed_managers.get(rand);
+
         List<String> hashes = null;
 
         while (hashes == null) {
@@ -425,7 +443,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 if (rand < 0) {
                     rand = 0;
                 }
-                manager = seed_managers.get(rand);
+                r_manager = seed_managers.get(rand);
             }
         }
 

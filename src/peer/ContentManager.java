@@ -209,21 +209,18 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     public void list_filtered_files(String restriction) {
         File f = new File(this.folder_route);
         List<Content> extra_files = new LinkedList<>();
-        FileFilter filter = new FileFilter() {
-            @Override
-            public boolean accept(File file) {
-                String restriction_method = restriction.split(":")[0];
-                String restriction_term;
-                try {
-                    restriction_term = restriction.split(":")[1];
-                } catch (IndexOutOfBoundsException e) {
-                    return true;
-                }
-                if (restriction_method.equals("name")) {
-                    return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
-                }
+        FileFilter filter = file -> {
+            String restriction_method = restriction.split(":")[0];
+            String restriction_term;
+            try {
+                restriction_term = restriction.split(":")[1];
+            } catch (IndexOutOfBoundsException e) {
                 return true;
             }
+            if (restriction_method.equals("name")) {
+                return file.getName().toLowerCase().contains(restriction_term.toLowerCase()) || file.isDirectory();
+            }
+            return true;
         };
         for (File file : Objects.requireNonNull(f.listFiles(filter))) {
             if (file.isFile()) {
@@ -552,6 +549,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * Get seeders of a hash from the web server
+     *
      * @param hash Hash of the file
      * @return List of seeders
      */
@@ -565,6 +563,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
 
     /**
      * Register a user in the web service
+     *
      * @param username Username
      * @param password Password
      * @return True if success
@@ -576,12 +575,62 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     }
 
     /**
-     * Add the login info to the service client so it can be used in the requests
+     * Add the login info to the service client, so it can be used in the requests
+     *
      * @param username username
      * @param password password
      */
     public void login(String username, String password) {
         serviceClient.username = username;
         serviceClient.password = password;
+    }
+
+    public boolean change_password(String pssword) throws UnirestException {
+        return serviceClient.changePassword(pssword);
+    }
+
+    public void delete(String hash) throws UnirestException {
+        if (hash.equals("")) {
+            serviceClient.deleteDescriptions();
+            serviceClient.deleteFilenames();
+            serviceClient.deleteTags();
+            serviceClient.deleteInfos(this.info);
+        } else if (hash.equals("cancel")) {
+            return;
+        } else {
+            serviceClient.deleteContent(hash);
+        }
+        logger.info("Deleted");
+    }
+
+    public void deleteInfos() throws UnirestException {
+        serviceClient.deleteInfos(this.info);
+    }
+
+    public List<Content> getServiceContents() throws UnirestException, JsonProcessingException {
+        List<ContentXML> cXMLs = serviceClient.getEverything();
+        List<Content> contents = new LinkedList<>();
+        for (ContentXML cXML : cXMLs){
+            Content content = new Content(new LinkedList<>(), new LinkedList<>(), cXML.hash, new LinkedList<>());
+            if (cXML.description != null) {
+                for (String desc : cXML.description) {
+                    content.add_alternative_description(desc);
+                }
+            }
+            if (cXML.filename != null) {
+                for (String name : cXML.filename) {
+                    if (!content.getFilenames().contains(name)) {
+                        content.add_alternative_name(name);
+                    }
+                }
+            }
+            if (cXML.tag != null) {
+                for (String tag : cXML.tag) {
+                    content.add_tag(tag);
+                }
+            }
+            contents.add(content);
+        }
+        return contents;
     }
 }

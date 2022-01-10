@@ -37,8 +37,8 @@ public class ServiceClient {
     public List<ContentXML> getEverything() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
                 baseurl)
-                .header("username", "user")
-                .header("password", "123hello")
+                .header("username", this.username)
+                .header("password", this.password)
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed " + response.getStatusText());
@@ -361,5 +361,33 @@ public class ServiceClient {
         }
         logger.info("Request to web server successful");
         return true;
+    }
+
+    public boolean changePassword(String pssword) throws UnirestException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.PUT,
+                baseurl + "/auth")
+                .header("username", this.username)
+                .header("password", this.password)
+                .header("new_password", pssword)
+                .asString();
+        if (response.getStatus() != 201) {
+            logger.info("Request to web server failed");
+            return false;
+        }
+        logger.info("Request to web server successful");
+        return true;
+    }
+
+    public void deleteContent(String hash) throws UnirestException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
+                baseurl + "/contents/{hash}")
+                .routeParam("hash", hash)
+                .header("username", this.username)
+                .header("password", this.password)
+                .asString();
+        if (response.getStatus() != 200) {
+            logger.info("Request to web server failed");
+        }
+        logger.info("Request to web server successful");
     }
 }
