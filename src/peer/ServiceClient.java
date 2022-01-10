@@ -24,7 +24,9 @@ public class ServiceClient {
     private final Logger logger;
 
     private final String protocol = "http://";
-    private final String baseurl = protocol + "localhost:8080/v1";
+    private final String baseurl = protocol + "localhost:8080/v2";
+    public String username;
+    public String password;
 
     public ServiceClient(Logger logger) {
         this.logger = logger;
@@ -35,6 +37,8 @@ public class ServiceClient {
     public List<ContentXML> getEverything() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
                 baseurl)
+                .header("username", "user")
+                .header("password", "123hello")
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed " + response.getStatusText());
@@ -56,7 +60,7 @@ public class ServiceClient {
 
     public ContentXML getEverything(String hash) throws UnirestException, IOException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/contents/{hash}")
+                baseurl + "/contents/{hash}")
                 .routeParam("hash", hash)
                 .asString();
         if (response.getStatus() != 200) {
@@ -65,14 +69,13 @@ public class ServiceClient {
         }
         logger.info("Request to web server successful");
         String body = response.getBody();
-        logger.severe(body);
         return new XmlMapper().readValue(body, ContentXML.class);
     }
 
 
     public List<FilenameXML> getFilenames() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "filenames")
                 .asString();
         if (response.getStatus() != 200) {
@@ -91,7 +94,7 @@ public class ServiceClient {
 
     public List<FilenameXML> getFilenames(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "filenames")
                 .asString();
@@ -111,8 +114,10 @@ public class ServiceClient {
 
     public void deleteFilenames() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "filenames")
+                .header("username", this.username)
+                .header("password", this.password)
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed " + response.getStatusText());
@@ -122,14 +127,16 @@ public class ServiceClient {
 
     public void postFilename(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "filenames")
+                .header("username", this.username)
+                .header("password", this.password)
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl +"/contents/{hash}/{resource}")
+                    baseurl + "/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "filenames")
                     .body(text)
@@ -144,7 +151,7 @@ public class ServiceClient {
 
     public List<DescriptionXML> getDescriptions() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "descriptions")
                 .asString();
         if (response.getStatus() != 200) {
@@ -163,7 +170,7 @@ public class ServiceClient {
 
     public List<DescriptionXML> getDescriptions(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "descriptions")
                 .asString();
@@ -183,8 +190,10 @@ public class ServiceClient {
 
     public void deleteDescriptions() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "descriptions")
+                .header("username", this.username)
+                .header("password", this.password)
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed");
@@ -194,14 +203,16 @@ public class ServiceClient {
 
     public void postDescription(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "descriptions")
+                .header("username", this.username)
+                .header("password", this.password)
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl +"/contents/{hash}/{resource}")
+                    baseurl + "/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "descriptions")
                     .body(text)
@@ -216,7 +227,7 @@ public class ServiceClient {
 
     public List<TagXML> getTags() throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "tags")
                 .asString();
         if (response.getStatus() != 200) {
@@ -235,7 +246,7 @@ public class ServiceClient {
 
     public List<TagXML> getTags(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "tags")
                 .asString();
@@ -255,8 +266,10 @@ public class ServiceClient {
 
     public void deleteTags() throws UnirestException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl +"/resources/{resource}")
+                baseurl + "/resources/{resource}")
                 .routeParam("resource", "tags")
+                .header("username", this.username)
+                .header("password", this.password)
                 .asString();
         if (response.getStatus() != 200) {
             logger.info("Request to web server failed");
@@ -266,14 +279,16 @@ public class ServiceClient {
 
     public void postTag(String hash, String text) throws UnirestException {
         HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "tags")
+                .header("username", this.username)
+                .header("password", this.password)
                 .body(text)
                 .asString();
         if (response1.getStatus() == 404) {
             HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl +"/contents/{hash}/{resource}")
+                    baseurl + "/contents/{hash}/{resource}")
                     .routeParam("hash", hash)
                     .routeParam("resource", "tags")
                     .body(text)
@@ -287,7 +302,7 @@ public class ServiceClient {
 
     public List<PeerInfo> getSeeders(String hash) throws UnirestException, JsonProcessingException {
         HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl +"/contents/{hash}/{resource}")
+                baseurl + "/contents/{hash}/{resource}")
                 .routeParam("hash", hash)
                 .routeParam("resource", "peers")
                 .asString();
@@ -303,5 +318,48 @@ public class ServiceClient {
             retval.add(PeerInfo.fromString((String) hmap.get("item")));
         }
         return retval;
+    }
+
+    public void deleteInfos(PeerInfo info) throws UnirestException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
+                baseurl + "/contents/search/{resource}")
+                .routeParam("resource", "peers")
+                .header("username", this.username)
+                .header("password", this.password)
+                .body(info.toString())
+                .asString();
+        if (response.getStatus() != 200) {
+            logger.info("Request to web server failed");
+        }
+        logger.info("Request to web server successful");
+    }
+
+    public void postPeer(String hash, PeerInfo info) throws UnirestException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
+                baseurl + "/contents/{hash}/{resource}")
+                .routeParam("hash", hash)
+                .routeParam("resource", "peers")
+                .header("username", this.username)
+                .header("password", this.password)
+                .body(info.toString())
+                .asString();
+        if (response.getStatus() != 201) {
+            logger.info("Request to web server failed");
+        }
+        logger.info("Request to web server successful");
+    }
+
+    public boolean register() throws UnirestException {
+        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
+                baseurl + "/auth")
+                .header("username", this.username)
+                .header("password", this.password)
+                .asString();
+        if (response.getStatus() != 201) {
+            logger.info("Request to web server failed");
+            return false;
+        }
+        logger.info("Request to web server successful");
+        return true;
     }
 }

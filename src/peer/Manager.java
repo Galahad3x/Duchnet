@@ -9,6 +9,7 @@ import java.util.List;
 public interface Manager extends Remote {
     /**
      * Given a hash, return the Content with a file_data, called remotely
+     *
      * @param hash the hash of the file to return
      * @return a Content with its file_data
      * @throws Exception if something fails
@@ -17,6 +18,7 @@ public interface Manager extends Remote {
 
     /**
      * Return the number of 1 MB slices needed to download a file
+     *
      * @param hash The hash of the file we want
      * @return The needed number of slices
      * @throws Exception If something fails
@@ -25,6 +27,7 @@ public interface Manager extends Remote {
 
     /**
      * Used to ask the manager for hashes, used when the file is too big
+     *
      * @param hash The hash of the whole file
      * @return List of all the hashes needed
      * @throws Exception If something fails
@@ -33,6 +36,7 @@ public interface Manager extends Remote {
 
     /**
      * Return the descriptions and tags of a content
+     *
      * @param hash The hash of the file we want
      * @return The content with descriptions and tags
      * @throws Exception if something fails
@@ -41,7 +45,8 @@ public interface Manager extends Remote {
 
     /**
      * Get the filename a file is saved with in the seeder
-     * @param hash The hash of the file
+     *
+     * @param hash  The hash of the file
      * @param names The names this file might have
      * @return The filename
      * @throws Exception If something fails

@@ -1,5 +1,7 @@
 package peer;
 
+import com.mashape.unirest.http.exceptions.UnirestException;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -19,6 +21,12 @@ import java.util.logging.Logger;
 public class PeerImp extends UnicastRemoteObject implements Peer {
 
     /**
+     * Logger class used to show messages to the user
+     * INFO level is disabled by default, used to debug
+     * WARNING and SEVERE are always on, they show errors
+     */
+    public static Logger logger = Logger.getLogger("peer");
+    /**
      * List of all the peers that the program has the Peers and Managers referenced
      */
     private final List<PeerInfo> saved_peers_info = new ArrayList<>();
@@ -30,20 +38,10 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * HashMap where Manager references are stored using their PeerInfo.toString();
      */
     private final HashMap<String, Manager> saved_managers = new HashMap<>();
-
-    /**
-     * The PeerInfo of this peer
-     */
-    private PeerInfo own_info;
-    /**
-     * The Manager of this peer
-     */
-    protected ContentManager manager;
     /**
      * The Registry of this peer
      */
     public Registry registry;
-
     /**
      * Thread that will run all the time, managing a queue of file threads
      */
@@ -52,13 +50,14 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * Thread that will run all the time, managing a queue of download threads
      */
     public GlobalQueueThread download_queue_thread;
-
     /**
-     * Logger class used to show messages to the user
-     * INFO level is disabled by default, used to debug
-     * WARNING and SEVERE are always on, they show errors
+     * The Manager of this peer
      */
-    public static Logger logger = Logger.getLogger("peer");
+    protected ContentManager manager;
+    /**
+     * The PeerInfo of this peer
+     */
+    private PeerInfo own_info;
 
     /**
      * Constructor used for isolated nodes
@@ -132,7 +131,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         System.out.println("Type the maximum number of download threads: ");
         try {
             download_threads = Integer.parseInt(scanner.nextLine());
-            if (download_threads < 1){
+            if (download_threads < 1) {
                 throw new NumberFormatException();
             }
         } catch (NumberFormatException e) {
@@ -142,7 +141,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         System.out.println("Type the maximum number of upload threads: ");
         try {
             upload_threads = Integer.parseInt(scanner.nextLine());
-            if (upload_threads < 1){
+            if (upload_threads < 1) {
                 throw new NumberFormatException();
             }
         } catch (NumberFormatException e) {
@@ -152,7 +151,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         System.out.println("Type the maximum number of file threads: ");
         try {
             file_threads = Integer.parseInt(scanner.nextLine());
-            if (file_threads < 1){
+            if (file_threads < 1) {
                 throw new NumberFormatException();
             }
         } catch (NumberFormatException e) {
@@ -160,7 +159,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             logger.info("Couldn't parse the number, setting default 4");
         }
         Semaphore upload_semaphore = new Semaphore(upload_threads);
-        this.manager = new ContentManager(file_route, upload_semaphore, logger);
+        this.manager = new ContentManager(file_route, upload_semaphore, logger, this.own_info);
         this.file_queue_thread = new GlobalQueueThread(file_threads);
         this.download_queue_thread = new GlobalQueueThread(download_threads);
         this.file_queue_thread.start();
@@ -206,6 +205,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("DOWNLOAD\t\tStart a download process");
                     System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
                     System.out.println("PROGRESS\t\tShow information about downloads in motion");
+                    System.out.println("REGISTER\t\tRegister in the web service");
+                    System.out.println("LOGIN\t\t\tLogin to the web service in this session");
                     break;
                 case "list":
                     // List files found locally without modifying
@@ -251,6 +252,38 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     this.download_queue_thread.printProgress();
                     System.out.println("---------------------");
                     this.file_queue_thread.printProgress();
+                    break;
+                case "register":
+                    // Register user
+                    String username;
+                    String password;
+                    while (true) {
+                        System.out.println("Type your username: ");
+                        username = scanner.nextLine();
+                        System.out.println("Type your password: ");
+                        password = scanner.nextLine();
+                        System.out.println("Repeat your password: ");
+                        if (!password.equals(scanner.nextLine())) {
+                            logger.warning("PASSWORDS DO NOT MATCH");
+                            continue;
+                        }
+                        break;
+                    }
+                    try {
+                        if (!this.manager.register(username, password)) {
+                            logger.warning("REGISTER FAILED: TRY ANOTHER USERNAME");
+                        }
+                    } catch (UnirestException e) {
+                        logger.warning("REGISTER FAILED: RETRY");
+                    }
+                    break;
+                case "login":
+                    // Set info of the session
+                    System.out.println("Type your username: ");
+                    String user_name = scanner.nextLine();
+                    System.out.println("Type your password: ");
+                    String pass_word = scanner.nextLine();
+                    this.manager.login(user_name, pass_word);
                     break;
             }
         }
@@ -351,8 +384,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     public void fetch_file(Content file_to_download, String filename) throws Exception {
         List<PeerInfo> seeders = find_seeders(file_to_download, new LinkedList<>());
         List<PeerInfo> seeders2 = this.manager.getSeeders(file_to_download.getHash());
-        for (PeerInfo p : seeders2){
-            if (!seeders.contains(p)){
+        for (PeerInfo p : seeders2) {
+            if (!seeders.contains(p)) {
                 seeders.add(p);
             }
         }
@@ -373,20 +406,28 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
             }
             seed_managers.add(saved_managers.get(peer_info.toString()));
         }
-        if (file_to_download == null) {
-            logger.severe("Something went wrong with the file selection");
-            return;
-        }
         String file_location;
         logger.info("Adding " + filename + " to the download queue");
 
         int rand = (new Random().nextInt()) % seed_managers.size();
-        if (rand < 0){
+        if (rand < 0) {
             rand = 0;
         }
+      
+        List<String> hashes = null;
 
-        Manager r_manager = seed_managers.get(rand);
-        List<String> hashes = r_manager.getHashesNeeded(file_to_download.getHash());
+        while (hashes == null) {
+            try {
+                hashes = manager.getHashesNeeded(file_to_download.getHash());
+            } catch (Exception e) {
+                seed_managers.remove(rand);
+                rand = (new Random().nextInt()) % seed_managers.size();
+                if (rand < 0) {
+                    rand = 0;
+                }
+                manager = seed_managers.get(rand);
+            }
+        }
 
         List<MyThread> threads = new LinkedList<>();
         for (String hash : hashes) {
@@ -469,8 +510,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     public static class GlobalQueueThread extends Thread {
         final Queue<MyThread> queue;
         final MyThread[] active;
-        boolean running = true;
         final Object lck;
+        boolean running = true;
 
         /**
          * Constructor for a queue thread
@@ -585,13 +626,13 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
     public static class FileQueueThread extends MyThread {
         final GlobalQueueThread file_queue_thread;
         final GlobalQueueThread download_queue_thread;
-        String hash_to_download;
         final List<Manager> seed_managers;
-        ByteSlice[] slices_array;
         final String file_location;
         final List<String> friend_hashes;
         final ContentManager manager;
         final String original_name;
+        String hash_to_download;
+        ByteSlice[] slices_array;
 
         /**
          * Constructor for a file thread
@@ -655,19 +696,28 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         public void write_file() {
             logger.info("Starting to write " + this.hash_to_download);
             try (FileOutputStream stream = new FileOutputStream(file_location)) {
+                int s_ind = 0;
                 for (ByteSlice byteSlice : this.slices_array) {
-                    if (byteSlice == null) {
-                        throw new RemoteException();
+                    int i_ind = 0;
+                    while (byteSlice == null) {
+                        Manager m = seed_managers.get(i_ind);
+                        DownloadThread dthread = new DownloadThread(download_queue_thread, this, m, s_ind);
+                        dthread.start();
+                        dthread.join();
+                        i_ind += 1;
                     }
                     byte[] bytes = byteSlice.getBytes();
                     for (int j = 0; j < byteSlice.getBytes_written(); j++) {
                         stream.write(bytes[j]);
                     }
+                    s_ind += 1;
                 }
             } catch (RemoteException e) {
                 logger.severe("A download thread for " + hash_to_download + "failed");
             } catch (IOException e) {
                 logger.severe("IOException while writing " + this.hash_to_download);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
             logger.severe("File " + hash_to_download + " downloaded!");
             if (this.friend_hashes.size() != 1) {
