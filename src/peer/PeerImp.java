@@ -725,6 +725,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         DownloadThread dthread = new DownloadThread(download_queue_thread, this, m, s_ind);
                         dthread.start();
                         dthread.join();
+                        byteSlice = this.slices_array[s_ind];
                         i_ind += 1;
                     }
                     byte[] bytes = byteSlice.getBytes();
