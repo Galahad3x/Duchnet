@@ -197,7 +197,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             merge_lists(contents, extra_files);
             databaseUpdate();
         } else {
-            update_files();
+            update_files(this.folder_route);
         }
     }
 
@@ -335,11 +335,15 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     /**
      * List all the files in the folder while letting the user add descriptions and tags
      */
-    private void update_files() {
-        File f = new File(this.folder_route);
+    private void update_files(String route) {
+        File f = new File(route);
         List<Content> extra_contents = new LinkedList<>();
         // TODO add directory support to this function
-        for (File file : Objects.requireNonNull(f.listFiles(File::isFile))) {
+        for (File file : Objects.requireNonNull(f.listFiles())) {
+            if (file.isDirectory()){
+                update_files(file.getAbsolutePath());
+                continue;
+            }
             System.out.println("File name: " + file.getName());
             Scanner scanner = new Scanner(System.in);
             System.out.println("Type descriptions separated by , or leave blank: ");

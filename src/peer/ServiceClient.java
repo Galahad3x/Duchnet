@@ -24,7 +24,7 @@ public class ServiceClient {
     private final Logger logger;
 
     private final String protocol = "http://";
-    private final String baseurl = protocol + "localhost:8080/v2";
+    private final String baseurl = protocol + "localhost:8080" + "/v2";
     public String username;
     public String password;
 

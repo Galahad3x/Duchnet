@@ -1,5 +1,6 @@
 package peer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mashape.unirest.http.exceptions.UnirestException;
 
 import java.io.File;
@@ -182,7 +183,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * Service loop of the peer, runs forever until closed by the user
      * Listens for commands
      */
-    public void service_loop() throws RemoteException, UnirestException {
+    public void service_loop() throws RemoteException, UnirestException, JsonProcessingException {
         Scanner scanner = new Scanner(System.in);
         while (true) {
             System.out.println("Please type a command: ");
@@ -201,7 +202,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("QUIT\t\t\tQuits the program");
                     System.out.println("HELP\t\t\tPrint this message");
                     System.out.println("LIST\t\t\tList all files found in your local directory");
-                    System.out.println("LIST ALL\t\tList all files found in the network");
+                    System.out.println("LIST ALL\t\tList all files found in the network and the service");
                     System.out.println("MODIFY\t\t\tAdd descriptions and tags to your files");
                     System.out.println("DOWNLOAD\t\tStart a download process");
                     System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
@@ -209,6 +210,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("REGISTER\t\tRegister in the web service");
                     System.out.println("LOGIN\t\t\tLogin to the web service in this session");
                     System.out.println("CHANGE\t\t\tChange your password in the service");
+                    System.out.println("DELETE\t\t\tDelete metadata from the server");
                     break;
                 case "list":
                     // List files found locally without modifying
@@ -218,6 +220,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "list all":
                     // Lists all files found in the network
                     List<Content> network_contents = this.find_network_contents(new LinkedList<>(), "name:");
+                    ContentManager.merge_lists(network_contents, this.manager.getServiceContents());
                     this.manager.print_contents(network_contents);
                     break;
                 case "modify":
