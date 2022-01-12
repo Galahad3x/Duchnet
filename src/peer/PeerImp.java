@@ -176,6 +176,11 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         // this.manager.list_files(false);
         logger.info("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
         logger.setLevel(Level.WARNING);
+        System.out.println("Type your username: ");
+        String user_name = scanner.nextLine();
+        System.out.println("Type your password: ");
+        String pass_word = scanner.nextLine();
+        this.manager.login(user_name, pass_word);
         this.service_loop();
     }
 

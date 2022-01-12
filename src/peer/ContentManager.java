@@ -1,6 +1,7 @@
 package peer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import common.ContentXML;
 
@@ -141,6 +142,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
             try {
                 ContentXML cXML = serviceClient.getEverything(content.getHash());
+                if (cXML == null){
+                    continue;
+                }
                 if (cXML.description != null) {
                     for (String desc : cXML.description) {
                         content.add_alternative_description(desc);
@@ -339,7 +343,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         File f = new File(route);
         List<Content> extra_contents = new LinkedList<>();
         // TODO add directory support to this function
-        for (File file : Objects.requireNonNull(f.listFiles())) {
+        for (File file : Objects.requireNonNull(f.listFiles(file -> !file.getName().startsWith(".")))) {
             if (file.isDirectory()){
                 update_files(file.getAbsolutePath());
                 continue;
@@ -614,6 +618,9 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     public List<Content> getServiceContents() throws UnirestException, JsonProcessingException {
         List<ContentXML> cXMLs = serviceClient.getEverything();
         List<Content> contents = new LinkedList<>();
+        if (cXMLs == null){
+            return contents;
+        }
         for (ContentXML cXML : cXMLs){
             Content content = new Content(new LinkedList<>(), new LinkedList<>(), cXML.hash, new LinkedList<>());
             if (cXML.description != null) {
