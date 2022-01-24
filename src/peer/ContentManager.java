@@ -1,8 +1,5 @@
 package peer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.exceptions.UnirestException;
 import common.ContentXML;
 
 import java.io.File;
@@ -122,7 +119,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     public void databaseUpdate() {
         try {
             serviceClient.deleteInfos(this.info);
-        } catch (UnirestException e) {
+        } catch (IOException | InterruptedException e) {
             logger.info("Request error");
         }
         for (Content content : contents) {
@@ -137,12 +134,12 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     serviceClient.postTag(content.getHash(), tag);
                 }
                 serviceClient.postPeer(content.getHash(), this.info);
-            } catch (UnirestException e) {
+            } catch (IOException | InterruptedException e) {
                 logger.info("Request error");
             }
             try {
                 ContentXML cXML = serviceClient.getEverything(content.getHash());
-                if (cXML == null){
+                if (cXML == null) {
                     continue;
                 }
                 if (cXML.description != null) {
@@ -162,7 +159,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                         content.add_tag(tag);
                     }
                 }
-            } catch (UnirestException | IOException e) {
+            } catch (IOException | InterruptedException e) {
                 logger.severe("Some error while processing XML");
                 e.printStackTrace();
             }
@@ -183,10 +180,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 if (file.isFile()) {
                     Content this_file = null;
                     try {
-                        this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                                new ArrayList<>(),
-                                HashCalculator.getFileHash(file),
-                                new ArrayList<>());
+                        this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())), new ArrayList<>(), HashCalculator.getFileHash(file), new ArrayList<>());
                     } catch (IOException e) {
                         logger.severe("IOException while calculating file");
                     } finally {
@@ -230,10 +224,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (file.isFile()) {
                 Content this_file = null;
                 try {
-                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                            new ArrayList<>(),
-                            HashCalculator.getFileHash(file),
-                            new ArrayList<>());
+                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())), new ArrayList<>(), HashCalculator.getFileHash(file), new ArrayList<>());
                 } catch (IOException e) {
                     logger.severe("IOException while calculating hash");
                 } finally {
@@ -318,10 +309,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (file.isFile()) {
                 Content this_file = null;
                 try {
-                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                            new ArrayList<>(),
-                            HashCalculator.getFileHash(file),
-                            new ArrayList<>());
+                    this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())), new ArrayList<>(), HashCalculator.getFileHash(file), new ArrayList<>());
                 } catch (IOException e) {
                     logger.severe("IOException while calculating hash");
                 } finally {
@@ -344,7 +332,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         List<Content> extra_contents = new LinkedList<>();
         // TODO add directory support to this function
         for (File file : Objects.requireNonNull(f.listFiles(file -> !file.getName().startsWith(".")))) {
-            if (file.isDirectory()){
+            if (file.isDirectory()) {
                 update_files(file.getAbsolutePath());
                 continue;
             }
@@ -356,10 +344,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             String[] tags = scanner.nextLine().split(",");
             Content this_file = null;
             try {
-                this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())),
-                        new LinkedList<>(Arrays.asList(descriptions)),
-                        HashCalculator.getFileHash(file),
-                        new LinkedList<>(Arrays.asList(tags)));
+                this_file = new Content(new ArrayList<>(Collections.singleton(file.getName())), new LinkedList<>(Arrays.asList(descriptions)), HashCalculator.getFileHash(file), new LinkedList<>(Arrays.asList(tags)));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -564,7 +549,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     public List<PeerInfo> getSeeders(String hash) {
         try {
             return this.serviceClient.getSeeders(hash);
-        } catch (UnirestException | JsonProcessingException e) {
+        } catch (IOException | InterruptedException e) {
             return new LinkedList<>();
         }
     }
@@ -575,9 +560,8 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
      * @param username Username
      * @param password Password
      * @return True if success
-     * @throws UnirestException If the request fails
      */
-    public boolean register(String username, String password) throws UnirestException {
+    public boolean register(String username, String password) throws IOException, InterruptedException {
         this.login(username, password);
         return this.serviceClient.register();
     }
@@ -593,35 +577,52 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
         serviceClient.password = password;
     }
 
-    public boolean change_password(String pssword) throws UnirestException {
+    public boolean change_password(String pssword) throws IOException, InterruptedException {
         return serviceClient.changePassword(pssword);
     }
 
-    public void delete(String hash) throws UnirestException {
+    public void delete(String hash) {
         if (hash.equals("")) {
-            serviceClient.deleteDescriptions();
-            serviceClient.deleteFilenames();
-            serviceClient.deleteTags();
-            serviceClient.deleteInfos(this.info);
+            try {
+                serviceClient.deleteDescriptions();
+                serviceClient.deleteFilenames();
+                serviceClient.deleteTags();
+                serviceClient.deleteInfos(this.info);
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
+            }
         } else if (hash.equals("cancel")) {
             return;
         } else {
-            serviceClient.deleteContent(hash);
+            try {
+                serviceClient.deleteContent(hash);
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
+            }
         }
         logger.info("Deleted");
     }
 
-    public void deleteInfos() throws UnirestException {
-        serviceClient.deleteInfos(this.info);
+    public void deleteInfos() {
+        try {
+            serviceClient.deleteInfos(this.info);
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
-    public List<Content> getServiceContents() throws UnirestException, JsonProcessingException {
-        List<ContentXML> cXMLs = serviceClient.getEverything();
+    public List<Content> getServiceContents() {
+        List<ContentXML> cXMLs = null;
+        try {
+            cXMLs = serviceClient.getEverything();
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
         List<Content> contents = new LinkedList<>();
-        if (cXMLs == null){
+        if (cXMLs == null) {
             return contents;
         }
-        for (ContentXML cXML : cXMLs){
+        for (ContentXML cXML : cXMLs) {
             Content content = new Content(new LinkedList<>(), new LinkedList<>(), cXML.hash, new LinkedList<>());
             if (cXML.description != null) {
                 for (String desc : cXML.description) {

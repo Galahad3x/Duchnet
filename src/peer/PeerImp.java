@@ -1,6 +1,5 @@
 package peer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.mashape.unirest.http.exceptions.UnirestException;
 
 import java.io.File;
@@ -188,7 +187,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
      * Service loop of the peer, runs forever until closed by the user
      * Listens for commands
      */
-    public void service_loop() throws RemoteException, UnirestException, JsonProcessingException {
+    public void service_loop() throws RemoteException {
         Scanner scanner = new Scanner(System.in);
         while (true) {
             System.out.println("Please type a command: ");
@@ -283,7 +282,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                         if (!this.manager.register(username, password)) {
                             logger.warning("REGISTER FAILED: TRY ANOTHER USERNAME");
                         }
-                    } catch (UnirestException e) {
+                    } catch (IOException | InterruptedException e) {
                         logger.warning("REGISTER FAILED: RETRY");
                     }
                     break;
@@ -298,11 +297,20 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                 case "change":
                     System.out.println("Type new password: ");
                     String pssword = scanner.nextLine();
-                    if(!this.manager.change_password(pssword)){
-                        logger.warning("PASSWORD CHANGE FAILED");
-                        break;
+                    try {
+                        if(!this.manager.change_password(pssword)){
+                            logger.warning("PASSWORD CHANGE FAILED");
+                            break;
+                        }
+                    } catch (IOException | InterruptedException e) {
+                        e.printStackTrace();
                     }
                     logger.warning("PASSWORD CHANGE SUCCESSFUL");
+                    System.out.println("Type your username: ");
+                    String user_name2 = scanner.nextLine();
+                    System.out.println("Type your password: ");
+                    String pass_word2 = scanner.nextLine();
+                    this.manager.login(user_name2, pass_word2);
                     break;
                 case "delete":
                     System.out.println("Type hash, leave empty or cancel");

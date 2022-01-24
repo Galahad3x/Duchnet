@@ -1,17 +1,17 @@
 package peer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.mashape.unirest.http.HttpMethod;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.exceptions.UnirestException;
-import com.mashape.unirest.request.HttpRequestWithBody;
 import common.ContentXML;
 import common.DescriptionXML;
 import common.FilenameXML;
 import common.TagXML;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,18 +34,24 @@ public class ServiceClient {
         Logger.getLogger("httpclient").setLevel(Level.SEVERE);
     }
 
-    public List<ContentXML> getEverything() throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl)
+    public List<ContentXML> getEverything() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseurl + "/"))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<ContentXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -58,32 +64,46 @@ public class ServiceClient {
         return retval;
     }
 
-    public ContentXML getEverything(String hash) throws UnirestException, IOException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/contents/{hash}")
-                .routeParam("hash", hash)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+    public ContentXML getEverything(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseurl + String.format("/contents/%s", hash)))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        String body = response.getBody();
+        String body = response.body();
         return new XmlMapper().readValue(body, ContentXML.class);
     }
 
 
-    public List<FilenameXML> getFilenames() throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "filenames")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+    public List<FilenameXML> getFilenames() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "filenames")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<FilenameXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -92,18 +112,23 @@ public class ServiceClient {
         return retval;
     }
 
-    public List<FilenameXML> getFilenames(String hash) throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "filenames")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+    public List<FilenameXML> getFilenames(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "filenames")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
-        logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<FilenameXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -112,54 +137,73 @@ public class ServiceClient {
         return retval;
     }
 
-    public void deleteFilenames() throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "filenames")
+    public void deleteFilenames() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "filenames")))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
         }
-        logger.info("Request to web server successful");
     }
 
-    public void postFilename(String hash, String text) throws UnirestException {
-        HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "filenames")
+    public void postFilename(String hash, String text) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "filenames")))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(text))
                 .header("username", this.username)
                 .header("password", this.password)
-                .body(text)
-                .asString();
-        if (response1.getStatus() == 404) {
-            HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl + "/contents/{hash}/{resource}")
-                    .routeParam("hash", hash)
-                    .routeParam("resource", "filenames")
-                    .body(text)
-                    .asString();
-            if (response.getStatus() != 201) {
-                logger.info("Request to web server failed " + response.getStatusText());
+                .build();
+        HttpResponse<String> response1 = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response1.statusCode() != 201) {
+            logger.info("Request to web server failed " + response1.statusCode());
+            return;
+        }
+        if (response1.statusCode() == 404) {
+            HttpRequest request2 = HttpRequest.newBuilder()
+                    .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "filenames")))
+                    .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("username", this.username)
+                    .header("password", this.password)
+                    .build();
+            HttpResponse<String> response2 = client.send(request2, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response2.statusCode() != 201) {
+                logger.info("Request to web server failed " + response2.statusCode());
             }
         }
         logger.info("Request to web server successful");
     }
 
 
-    public List<DescriptionXML> getDescriptions() throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "descriptions")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+    public List<DescriptionXML> getDescriptions() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "descriptions")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 201) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<DescriptionXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -168,18 +212,24 @@ public class ServiceClient {
         return retval;
     }
 
-    public List<DescriptionXML> getDescriptions(String hash) throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "descriptions")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+    public List<DescriptionXML> getDescriptions(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "descriptions")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<DescriptionXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -188,54 +238,75 @@ public class ServiceClient {
         return retval;
     }
 
-    public void deleteDescriptions() throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "descriptions")
+    public void deleteDescriptions() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "descriptions")))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return;
         }
         logger.info("Request to web server successful");
     }
 
-    public void postDescription(String hash, String text) throws UnirestException {
-        HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "descriptions")
+    public void postDescription(String hash, String text) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "descriptions")))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(text))
                 .header("username", this.username)
                 .header("password", this.password)
-                .body(text)
-                .asString();
-        if (response1.getStatus() == 404) {
-            HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl + "/contents/{hash}/{resource}")
-                    .routeParam("hash", hash)
-                    .routeParam("resource", "descriptions")
-                    .body(text)
-                    .asString();
-            if (response.getStatus() != 201) {
-                logger.info("Request to web server failed " + response.getStatusText());
+                .build();
+        HttpResponse<String> response1 = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response1.statusCode() != 201) {
+            logger.info("Request to web server failed " + response1.statusCode());
+            return;
+        }
+        if (response1.statusCode() == 404) {
+            HttpRequest request2 = HttpRequest.newBuilder()
+                    .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "descriptions")))
+                    .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("username", this.username)
+                    .header("password", this.password)
+                    .build();
+            HttpResponse<String> response2 = client.send(request2, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response2.statusCode() != 201) {
+                logger.info("Request to web server failed " + response2.statusCode());
             }
         }
         logger.info("Request to web server successful");
     }
 
 
-    public List<TagXML> getTags() throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "tags")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+    public List<TagXML> getTags() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "tags")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<TagXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -244,18 +315,24 @@ public class ServiceClient {
         return retval;
     }
 
-    public List<TagXML> getTags(String hash) throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "tags")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+    public List<TagXML> getTags(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "tags")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<TagXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -264,54 +341,74 @@ public class ServiceClient {
         return retval;
     }
 
-    public void deleteTags() throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl + "/resources/{resource}")
-                .routeParam("resource", "tags")
+    public void deleteTags() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s", baseurl, "tags")))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return;
         }
         logger.info("Request to web server successful");
     }
 
-    public void postTag(String hash, String text) throws UnirestException {
-        HttpResponse<String> response1 = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "tags")
+    public void postTag(String hash, String text) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "tags")))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(text))
                 .header("username", this.username)
                 .header("password", this.password)
-                .body(text)
-                .asString();
-        if (response1.getStatus() == 404) {
-            HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                    baseurl + "/contents/{hash}/{resource}")
-                    .routeParam("hash", hash)
-                    .routeParam("resource", "tags")
-                    .body(text)
-                    .asString();
-            if (response.getStatus() != 201) {
-                logger.info("Request to web server failed " + response.getStatusText());
+                .build();
+        HttpResponse<String> response1 = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response1.statusCode() != 201) {
+            logger.info("Request to web server failed " + response1.statusCode());
+            return;
+        }
+        if (response1.statusCode() == 404) {
+            HttpRequest request2 = HttpRequest.newBuilder()
+                    .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "tags")))
+                    .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("username", this.username)
+                    .header("password", this.password)
+                    .build();
+            HttpResponse<String> response2 = client.send(request2, java.net.http.HttpResponse.BodyHandlers.ofString());
+            if (response2.statusCode() != 201) {
+                logger.info("Request to web server failed " + response2.statusCode());
             }
         }
         logger.info("Request to web server successful");
     }
 
-    public List<PeerInfo> getSeeders(String hash) throws UnirestException, JsonProcessingException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.GET,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "peers")
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed " + response.getStatusText());
+    public List<PeerInfo> getSeeders(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "peers")))
+                .method("GET", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
         logger.info("Request to web server successful");
-        List<?> XMLs = new XmlMapper().readValue(response.getBody(), List.class);
+        List<?> XMLs = new XmlMapper().readValue(response.body(), List.class);
         List<PeerInfo> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
@@ -320,73 +417,100 @@ public class ServiceClient {
         return retval;
     }
 
-    public void deleteInfos(PeerInfo info) throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl + "/contents/search/{resource}")
-                .routeParam("resource", "peers")
+    public void deleteInfos(PeerInfo info) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/search/%s", baseurl, "peers")))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(info.toString()))
                 .header("username", this.username)
                 .header("password", this.password)
-                .body(info.toString())
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return;
         }
         logger.info("Request to web server successful");
     }
 
-    public void postPeer(String hash, PeerInfo info) throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                baseurl + "/contents/{hash}/{resource}")
-                .routeParam("hash", hash)
-                .routeParam("resource", "peers")
+    public void postPeer(String hash, PeerInfo info) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "peers")))
+                .method("POST", HttpRequest.BodyPublishers.ofString(info.toString()))
                 .header("username", this.username)
                 .header("password", this.password)
-                .body(info.toString())
-                .asString();
-        if (response.getStatus() != 201) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 201) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return;
         }
         logger.info("Request to web server successful");
     }
 
-    public boolean register() throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.POST,
-                baseurl + "/auth")
+    public boolean register() throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/auth", baseurl)))
+                .method("POST", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 201) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 201) {
+            logger.info("Request to web server failed " + response.statusCode());
             return false;
         }
         logger.info("Request to web server successful");
         return true;
     }
 
-    public boolean changePassword(String pssword) throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.PUT,
-                baseurl + "/auth")
+    public boolean changePassword(String pssword) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/auth", baseurl)))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
                 .header("new_password", pssword)
-                .asString();
-        if (response.getStatus() != 201) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
             return false;
         }
         logger.info("Request to web server successful");
         return true;
     }
 
-    public void deleteContent(String hash) throws UnirestException {
-        HttpResponse<String> response = new HttpRequestWithBody(HttpMethod.DELETE,
-                baseurl + "/contents/{hash}")
-                .routeParam("hash", hash)
+    public void deleteContent(String hash) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/contents/%s", baseurl, hash)))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
                 .header("username", this.username)
                 .header("password", this.password)
-                .asString();
-        if (response.getStatus() != 200) {
-            logger.info("Request to web server failed");
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return;
         }
         logger.info("Request to web server successful");
     }
