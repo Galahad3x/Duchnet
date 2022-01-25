@@ -175,11 +175,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         // this.manager.list_files(false);
         logger.info("Peer started successfully at " + own_info.ip + ":" + own_info.port.toString());
         logger.setLevel(Level.WARNING);
-        System.out.println("Type your username: ");
-        String user_name = scanner.nextLine();
-        System.out.println("Type your password: ");
-        String pass_word = scanner.nextLine();
-        this.manager.login(user_name, pass_word);
+        logger.severe("DON'T FORGET TO REGISTER/LOGIN!!!!1");
         this.service_loop();
     }
 
@@ -208,6 +204,8 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("LIST\t\t\tList all files found in your local directory");
                     System.out.println("LIST ALL\t\tList all files found in the network and the service");
                     System.out.println("MODIFY\t\t\tAdd descriptions and tags to your files");
+                    System.out.println("WSMODIFY\t\t\tModify a description");
+                    System.out.println("WSDELETE\t\t\tDelete a description");
                     System.out.println("DOWNLOAD\t\tStart a download process");
                     System.out.println("DEBUG\t\t\tToggle between INFO and WARNING debug");
                     System.out.println("PROGRESS\t\tShow information about downloads in motion");
@@ -316,6 +314,24 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("Type hash, leave empty or cancel");
                     String hash = scanner.nextLine();
                     this.manager.delete(hash);
+                    break;
+                case "wsmodify":
+                    System.out.println("Type the resource type: ");
+                    String type = scanner.nextLine();
+                    try {
+                        this.manager.wsModify(type);
+                    } catch (IOException | InterruptedException e) {
+                        logger.warning("MODIFY FAILED");
+                    }
+                    break;
+                case "wsdelete":
+                    System.out.println("Type the resource type: ");
+                    type = scanner.nextLine();
+                    try {
+                        this.manager.wsDelete(type);
+                    } catch (IOException | InterruptedException e) {
+                        logger.warning("MODIFY FAILED");
+                    }
                     break;
             }
         }

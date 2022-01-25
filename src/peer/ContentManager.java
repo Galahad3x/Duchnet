@@ -1,6 +1,8 @@
 package peer;
 
 import common.ContentXML;
+import common.DescriptionXML;
+import common.TagXML;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -82,7 +84,15 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             for (Content content : original) {
                 if (content.getHash().equals(this_file.getHash())) {
                     found = true;
-                    if (!this_file.getFilenames().get(0).equals("")) {
+                    try {
+                        if (!this_file.getFilenames().get(0).equals("")) {
+                            for (String name : this_file.getFilenames()) {
+                                if (!content.getFilenames().contains(name)) {
+                                    content.add_alternative_name(name);
+                                }
+                            }
+                        }
+                    } catch (IndexOutOfBoundsException e) {
                         for (String name : this_file.getFilenames()) {
                             if (!content.getFilenames().contains(name)) {
                                 content.add_alternative_name(name);
@@ -123,6 +133,11 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             logger.info("Request error");
         }
         for (Content content : contents) {
+            if (content.getFilenames().size() > 0) {
+                if (content.getFilenames().get(0).startsWith(".")) {
+                    continue;
+                }
+            }
             try {
                 for (String desc : content.getFileDescriptions()) {
                     serviceClient.postDescription(content.getHash(), desc);
@@ -330,7 +345,6 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
     private void update_files(String route) {
         File f = new File(route);
         List<Content> extra_contents = new LinkedList<>();
-        // TODO add directory support to this function
         for (File file : Objects.requireNonNull(f.listFiles(file -> !file.getName().startsWith(".")))) {
             if (file.isDirectory()) {
                 update_files(file.getAbsolutePath());
@@ -643,6 +657,175 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             }
             contents.add(content);
         }
+        databaseUpdate();
         return contents;
+    }
+
+    public void wsModify(String type) throws IOException, InterruptedException {
+        Scanner scanner = new Scanner(System.in);
+        if (type.equals("descriptions")) {
+            List<DescriptionXML> XMLs = this.serviceClient.getDescriptions();
+            if (XMLs == null) {
+                return;
+            }
+            for (DescriptionXML XML : XMLs) {
+                System.out.println(XML.hash + " (" + XML.id + "): " + XML.description.get(0));
+            }
+            System.out.println("Select ID: ");
+            long id;
+            try {
+                id = Long.parseLong(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                logger.warning("Error while parsing ID");
+                return;
+            }
+            System.out.println("Type new description: ");
+            String new_desc = scanner.nextLine();
+            if (this.serviceClient.modifyDescription(id, new_desc)){
+                boolean found = false;
+                for (Content content : contents) {
+                    if (content.getFileDescriptions() != null) {
+                        if (found) {
+                            break;
+                        }
+                        for (String desc : content.getFileDescriptions()) {
+                            if (desc.equals(new_desc)) {
+                                found = true;
+                                content.getFileDescriptions().remove(desc);
+                                break;
+                            }
+                        }
+                    }
+                }
+                databaseUpdate();
+            }
+        } else if (type.equals("tags")) {
+            List<TagXML> XMLs = this.serviceClient.getTags();
+            if (XMLs == null) {
+                return;
+            }
+            for (TagXML XML : XMLs) {
+                System.out.println(XML.hash + " (" + XML.id + "): " + XML.tag.get(0));
+            }
+            System.out.println("Select ID: ");
+            long id;
+            try {
+                id = Long.parseLong(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                logger.warning("Error while parsing ID");
+                return;
+            }
+            System.out.println("Type new tag: ");
+            String new_desc = scanner.nextLine();
+            if (this.serviceClient.modifyTag(id, new_desc)) {
+                boolean found = false;
+                for (Content content : contents) {
+                    if (content.getTags() != null) {
+                        if (found) {
+                            break;
+                        }
+                        for (String desc : content.getTags()) {
+                            if (desc.equals(new_desc)) {
+                                found = true;
+                                content.getTags().remove(desc);
+                                break;
+                            }
+                        }
+                    }
+                }
+                databaseUpdate();
+            }
+        } else {
+            logger.warning("Resource type not valid");
+        }
+    }
+
+    public void wsDelete(String type) throws IOException, InterruptedException {
+        Scanner scanner = new Scanner(System.in);
+        if (type.equals("descriptions")) {
+            List<DescriptionXML> XMLs = this.serviceClient.getDescriptions();
+            if (XMLs == null) {
+                return;
+            }
+            for (DescriptionXML XML : XMLs) {
+                System.out.println(XML.hash + " (" + XML.id + "): " + XML.description.get(0));
+            }
+            System.out.println("Select ID: ");
+            Long id;
+            try {
+                id = Long.parseLong(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                logger.warning("Error while parsing ID");
+                return;
+            }
+            String new_desc = null;
+            for (DescriptionXML XML : XMLs) {
+                if (id.equals(XML.id)) {
+                    new_desc = XML.description.get(0);
+                    break;
+                }
+            }
+            if (this.serviceClient.deleteDescription(id)){
+                boolean found = false;
+                for (Content content : contents) {
+                    if (content.getFileDescriptions() != null) {
+                        if (found) {
+                            break;
+                        }
+                        for (String desc : content.getFileDescriptions()) {
+                            if (desc.equals(new_desc)) {
+                                found = true;
+                                content.getFileDescriptions().remove(desc);
+                                break;
+                            }
+                        }
+                    }
+                }
+                databaseUpdate();
+            }
+        } else if (type.equals("tags")) {
+            List<TagXML> XMLs = this.serviceClient.getTags();
+            if (XMLs == null) {
+                return;
+            }
+            for (TagXML XML : XMLs) {
+                System.out.println(XML.hash + " (" + XML.id + "): " + XML.tag.get(0));
+            }
+            System.out.println("Select ID: ");
+            Long id;
+            try {
+                id = Long.parseLong(scanner.nextLine());
+            } catch (NumberFormatException e) {
+                logger.warning("Error while parsing ID");
+                return;
+            }
+            String new_desc = null;
+            for (TagXML XML : XMLs) {
+                if (id.equals(XML.id)) {
+                    new_desc = XML.tag.get(0);
+                    break;
+                }
+            }
+            if (this.serviceClient.deleteTag(id)){
+                boolean found = false;
+                for (Content content : contents) {
+                    if (content.getTags() != null) {
+                        if (found) {
+                            break;
+                        }
+                        for (String desc : content.getTags()) {
+                            if (desc.equals(new_desc)) {
+                                found = true;
+                                content.getTags().remove(desc);
+                                break;
+                            }
+                        }
+                    }
+                }
+                databaseUpdate();
+            }
+        } else {
+            logger.warning("Resource type not valid");
+        }
     }
 }

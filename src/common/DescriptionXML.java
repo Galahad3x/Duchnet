@@ -24,6 +24,10 @@ public class DescriptionXML {
         this.id = id;
     }
 
+    public DescriptionXML(){
+
+    }
+
     public void setId(Long id) {
         this.id = id;
     }

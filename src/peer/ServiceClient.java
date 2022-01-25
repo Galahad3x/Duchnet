@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -162,6 +163,7 @@ public class ServiceClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "filenames")))
                 .method("PUT", HttpRequest.BodyPublishers.ofString(text))
+                .header("Content-Type", "text/plain")
                 .header("username", this.username)
                 .header("password", this.password)
                 .build();
@@ -174,6 +176,7 @@ public class ServiceClient {
             HttpRequest request2 = HttpRequest.newBuilder()
                     .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "filenames")))
                     .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("Content-Type", "text/plain")
                     .header("username", this.username)
                     .header("password", this.password)
                     .build();
@@ -198,7 +201,7 @@ public class ServiceClient {
                 .header("password", this.password)
                 .build();
         HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 201) {
+        if (response.statusCode() != 200) {
             logger.info("Request to web server failed " + response.statusCode());
             return null;
         }
@@ -207,7 +210,7 @@ public class ServiceClient {
         List<DescriptionXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
-            retval.add(new DescriptionXML((String) hmap.get("hash"), (List<String>) hmap.get("description")));
+            retval.add(new DescriptionXML((String) hmap.get("hash"), Long.parseLong((String) hmap.get("id")), new LinkedList<>(Collections.singletonList((String) hmap.get("description")))));
         }
         return retval;
     }
@@ -265,6 +268,7 @@ public class ServiceClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "descriptions")))
                 .method("PUT", HttpRequest.BodyPublishers.ofString(text))
+                .header("Content-Type", "text/plain")
                 .header("username", this.username)
                 .header("password", this.password)
                 .build();
@@ -277,6 +281,7 @@ public class ServiceClient {
             HttpRequest request2 = HttpRequest.newBuilder()
                     .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "descriptions")))
                     .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("Content-Type", "text/plain")
                     .header("username", this.username)
                     .header("password", this.password)
                     .build();
@@ -286,6 +291,28 @@ public class ServiceClient {
             }
         }
         logger.info("Request to web server successful");
+    }
+
+    public boolean modifyDescription(Long id, String desc) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s/%s", baseurl, "descriptions", id.toString())))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(desc))
+                .header("Content-Type", "text/plain")
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed");
+            return false;
+        } else {
+            logger.info("Request to web server successful");
+            return true;
+        }
     }
 
 
@@ -310,7 +337,7 @@ public class ServiceClient {
         List<TagXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
-            retval.add(new TagXML((String) hmap.get("hash"), (List<String>) hmap.get("tag")));
+            retval.add(new TagXML((String) hmap.get("hash"), Long.parseLong((String) hmap.get("id")), new LinkedList<>(Collections.singletonList((String) hmap.get("tag")))));
         }
         return retval;
     }
@@ -368,6 +395,7 @@ public class ServiceClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "tags")))
                 .method("PUT", HttpRequest.BodyPublishers.ofString(text))
+                .header("Content-Type", "text/plain")
                 .header("username", this.username)
                 .header("password", this.password)
                 .build();
@@ -380,6 +408,7 @@ public class ServiceClient {
             HttpRequest request2 = HttpRequest.newBuilder()
                     .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "tags")))
                     .method("POST", HttpRequest.BodyPublishers.ofString(text))
+                    .header("Content-Type", "text/plain")
                     .header("username", this.username)
                     .header("password", this.password)
                     .build();
@@ -390,6 +419,29 @@ public class ServiceClient {
         }
         logger.info("Request to web server successful");
     }
+
+    public boolean modifyTag(Long id, String desc) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s/%s", baseurl, "tags", id.toString())))
+                .method("PUT", HttpRequest.BodyPublishers.ofString(desc))
+                .header("Content-Type", "text/plain")
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed");
+            return false;
+        } else {
+            logger.info("Request to web server successful");
+            return true;
+        }
+    }
+
 
     public List<PeerInfo> getSeeders(String hash) throws IOException, InterruptedException {
         HttpClient client = HttpClient.newBuilder()
@@ -425,6 +477,7 @@ public class ServiceClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(String.format("%s/contents/search/%s", baseurl, "peers")))
                 .method("DELETE", HttpRequest.BodyPublishers.ofString(info.toString()))
+                .header("Content-Type", "text/plain")
                 .header("username", this.username)
                 .header("password", this.password)
                 .build();
@@ -444,6 +497,7 @@ public class ServiceClient {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(String.format("%s/contents/%s/%s", baseurl, hash, "peers")))
                 .method("POST", HttpRequest.BodyPublishers.ofString(info.toString()))
+                .header("Content-Type", "text/plain")
                 .header("username", this.username)
                 .header("password", this.password)
                 .build();
@@ -513,5 +567,45 @@ public class ServiceClient {
             return;
         }
         logger.info("Request to web server successful");
+    }
+
+    public boolean deleteDescription(Long id) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s/%s", baseurl, "descriptions", id.toString())))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return false;
+        }
+        logger.info("Request to web server successful");
+        return true;
+    }
+
+    public boolean deleteTag(Long id) throws IOException, InterruptedException {
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(String.format("%s/resources/%s/%s", baseurl, "tags", id.toString())))
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(""))
+                .header("username", this.username)
+                .header("password", this.password)
+                .build();
+        HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            logger.info("Request to web server failed " + response.statusCode());
+            return false;
+        }
+        logger.info("Request to web server successful");
+        return true;
     }
 }

@@ -22,4 +22,7 @@ public class ContentXML {
         this.description = descriptions;
         this.tag = tags;
     }
+
+    public ContentXML(){
+    }
 }

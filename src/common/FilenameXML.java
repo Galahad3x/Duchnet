@@ -24,6 +24,10 @@ public class FilenameXML {
         this.id = id;
     }
 
+    public FilenameXML(){
+
+    }
+
     public void setId(Long id) {
         this.id = id;
     }

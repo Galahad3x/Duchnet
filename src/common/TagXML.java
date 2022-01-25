@@ -24,6 +24,10 @@ public class TagXML {
         this.id = id;
     }
 
+    public TagXML(){
+
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
