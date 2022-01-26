@@ -75,6 +75,14 @@ public class Content implements Serializable {
         }
     }
 
+    public void deleteDescription(String text){
+        this.file_description.removeIf(d -> d.equals(text));
+    }
+
+    public void deleteTag(String text){
+        this.tags.removeIf(d -> d.equals(text));
+    }
+
     public String getHash() {
         return hash;
     }

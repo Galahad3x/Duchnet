@@ -296,7 +296,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
                     System.out.println("Type new password: ");
                     String pssword = scanner.nextLine();
                     try {
-                        if(!this.manager.change_password(pssword)){
+                        if (!this.manager.change_password(pssword)) {
                             logger.warning("PASSWORD CHANGE FAILED");
                             break;
                         }
@@ -350,6 +350,7 @@ public class PeerImp extends UnicastRemoteObject implements Peer {
         }
         List<Content> network_contents = find_network_contents(new LinkedList<>(), search_method + ":" + search_term);
         ContentManager.merge_lists(network_contents, this.manager.getServiceContents());
+        network_contents = this.manager.filter_contents(network_contents, search_method + ":" + search_term);
         Content file_to_download = let_user_choose_file(network_contents);
         if (file_to_download == null) {
             logger.warning("The file you specified has not been found, no download has been started");

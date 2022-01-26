@@ -56,9 +56,24 @@ public class ServiceClient {
         List<ContentXML> retval = new LinkedList<>();
         for (Object XML : XMLs) {
             LinkedHashMap<String, Object> hmap = (LinkedHashMap<String, Object>) XML;
-            List<String> fname = (List<String>) hmap.get("filename");
-            List<String> descs = (List<String>) hmap.get("description");
-            List<String> tgs = (List<String>) hmap.get("tag");
+            List<String> fname;
+            List<String> descs;
+            List<String> tgs;
+            try {
+                fname = (List<String>) hmap.get("filename");
+            } catch (ClassCastException e) {
+                fname = new LinkedList<>(Collections.singletonList((String) hmap.get("filename")));
+            }
+            try {
+                descs = (List<String>) hmap.get("description");
+            } catch (ClassCastException e) {
+                descs = new LinkedList<>(Collections.singletonList((String) hmap.get("description")));
+            }
+            try {
+                tgs = (List<String>) hmap.get("tag");
+            } catch (ClassCastException e) {
+                tgs = new LinkedList<>(Collections.singletonList((String) hmap.get("tag")));
+            }
             ContentXML content = new ContentXML((String) hmap.get("hash"), fname, descs, tgs);
             retval.add(content);
         }

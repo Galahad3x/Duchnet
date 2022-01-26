@@ -668,8 +668,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (XMLs == null) {
                 return;
             }
+            list_files(false);
             for (DescriptionXML XML : XMLs) {
-                System.out.println(XML.hash + " (" + XML.id + "): " + XML.description.get(0));
+                for (Content content : contents) {
+                    if (content.getHash().equals(XML.hash)) {
+                        System.out.println(content.getFilenames().get(0) + " (" + XML.id + "): " + XML.description.get(0));
+                        break;
+                    }
+                }
             }
             System.out.println("Select ID: ");
             long id;
@@ -679,23 +685,17 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 logger.warning("Error while parsing ID");
                 return;
             }
+            String old_text = null;
+            for (DescriptionXML XML : XMLs) {
+                if (XML.id.equals(id)){
+                    old_text = XML.description.get(0);
+                }
+            }
             System.out.println("Type new description: ");
             String new_desc = scanner.nextLine();
-            if (this.serviceClient.modifyDescription(id, new_desc)){
-                boolean found = false;
-                for (Content content : contents) {
-                    if (content.getFileDescriptions() != null) {
-                        if (found) {
-                            break;
-                        }
-                        for (String desc : content.getFileDescriptions()) {
-                            if (desc.equals(new_desc)) {
-                                found = true;
-                                content.getFileDescriptions().remove(desc);
-                                break;
-                            }
-                        }
-                    }
+            if (this.serviceClient.modifyDescription(id, new_desc)) {
+                for (Content content : contents){
+                    content.deleteDescription(old_text);
                 }
                 databaseUpdate();
             }
@@ -704,8 +704,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (XMLs == null) {
                 return;
             }
+            list_files(false);
             for (TagXML XML : XMLs) {
-                System.out.println(XML.hash + " (" + XML.id + "): " + XML.tag.get(0));
+                for (Content content : contents) {
+                    if (content.getHash().equals(XML.hash)) {
+                        System.out.println(content.getFilenames().get(0) + " (" + XML.id + "): " + XML.tag.get(0));
+                        break;
+                    }
+                }
             }
             System.out.println("Select ID: ");
             long id;
@@ -715,23 +721,17 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                 logger.warning("Error while parsing ID");
                 return;
             }
+            String old_text = null;
+            for (TagXML XML : XMLs) {
+                if (XML.id.equals(id)){
+                    old_text = XML.tag.get(0);
+                }
+            }
             System.out.println("Type new tag: ");
             String new_desc = scanner.nextLine();
             if (this.serviceClient.modifyTag(id, new_desc)) {
-                boolean found = false;
-                for (Content content : contents) {
-                    if (content.getTags() != null) {
-                        if (found) {
-                            break;
-                        }
-                        for (String desc : content.getTags()) {
-                            if (desc.equals(new_desc)) {
-                                found = true;
-                                content.getTags().remove(desc);
-                                break;
-                            }
-                        }
-                    }
+                for (Content content : contents){
+                    content.deleteTag(old_text);
                 }
                 databaseUpdate();
             }
@@ -747,8 +747,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (XMLs == null) {
                 return;
             }
+            list_files(false);
             for (DescriptionXML XML : XMLs) {
-                System.out.println(XML.hash + " (" + XML.id + "): " + XML.description.get(0));
+                for (Content content : contents) {
+                    if (content.getHash().equals(XML.hash)) {
+                        System.out.println(content.getFilenames().get(0) + " (" + XML.id + "): " + XML.description.get(0));
+                        break;
+                    }
+                }
             }
             System.out.println("Select ID: ");
             Long id;
@@ -765,7 +771,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     break;
                 }
             }
-            if (this.serviceClient.deleteDescription(id)){
+            if (this.serviceClient.deleteDescription(id)) {
                 boolean found = false;
                 for (Content content : contents) {
                     if (content.getFileDescriptions() != null) {
@@ -788,8 +794,14 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
             if (XMLs == null) {
                 return;
             }
+            list_files(false);
             for (TagXML XML : XMLs) {
-                System.out.println(XML.hash + " (" + XML.id + "): " + XML.tag.get(0));
+                for (Content content : contents) {
+                    if (content.getHash().equals(XML.hash)) {
+                        System.out.println(content.getFilenames().get(0) + " (" + XML.id + "): " + XML.tag.get(0));
+                        break;
+                    }
+                }
             }
             System.out.println("Select ID: ");
             Long id;
@@ -806,7 +818,7 @@ public class ContentManager extends UnicastRemoteObject implements Remote, Manag
                     break;
                 }
             }
-            if (this.serviceClient.deleteTag(id)){
+            if (this.serviceClient.deleteTag(id)) {
                 boolean found = false;
                 for (Content content : contents) {
                     if (content.getTags() != null) {
